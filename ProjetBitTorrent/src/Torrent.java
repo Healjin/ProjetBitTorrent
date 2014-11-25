@@ -37,6 +37,9 @@ public class Torrent {
 			System.err.println("Error while getting SHA-1 infoHash");
 		}
 		
+		// Set peerID
+		this.peerID = "01234567890123456789";
+		
 		// Set downloaded, uploaded and left values
 		this.uploaded = 0;
 		this.downloaded = 0;
