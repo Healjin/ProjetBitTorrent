@@ -37,7 +37,7 @@ public class Torrent {
 		try {
 			MessageDigest md = null;
 			md = MessageDigest.getInstance("SHA-1");
-			byte[] sha1 = md.digest("lol".getBytes());
+			byte[] sha1 = md.digest(torrent.getInfo().getBytes());
 			this.infoHash = URLEncoder.encode(sha1.toString(), "UTF-8");
 		} catch (Exception e) {
 			System.err.println("Error while getting SHA-1 infoHash");
