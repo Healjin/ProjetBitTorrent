@@ -8,8 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import javax.xml.bind.DatatypeConverter;
-
 import org.ardverk.coding.BencodingInputStream;
 
 public class Metafile {
@@ -18,9 +16,9 @@ public class Metafile {
 	private String announce;
 	private ArrayList<String> announce_list;
 	private String comment;
-	private String created_by;
-	private Date creation_date;
-	private TreeMap<String, ?> info; // Dictionnaire
+	private String createdBy;
+	private Date creationDate;
+	private TreeMap<String, ?> info; // Dictionary
 	private String name;
 	private Integer piece_length;
 	private byte[] pieces;
@@ -29,9 +27,11 @@ public class Metafile {
 	private Integer length;
 
 	// Multi file
-	private ArrayList<TreeMap<String, ArrayList<byte[]>>> files;
+	private ArrayList<TreeMap<String, ?>> files;
 
-	@SuppressWarnings({"unchecked" })
+	boolean multiFile = false;
+
+	@SuppressWarnings({ "unchecked" })
 	public Metafile(String file) {
 		BencodingInputStream bencodeDecoder;
 		try {
@@ -50,17 +50,19 @@ public class Metafile {
 			if (fileContent.get("comment") != null)
 				comment = new String((byte[]) fileContent.get("comment"));
 			if (fileContent.get("created_by") != null)
-				created_by = new String((byte[]) fileContent.get("created_by"));
+				createdBy = new String((byte[]) fileContent.get("created_by"));
 			if (fileContent.get("creation date") != null)
-				creation_date = new java.util.Date((long) ((BigInteger) fileContent.get("creation date")).intValue() * 1000);
+				creationDate = new java.util.Date((long) ((BigInteger) fileContent.get("creation date")).intValue() * 1000);
 			if (fileContent.get("name") != null)
 				name = new String((byte[]) fileContent.get("name"));
 
 			if (fileContent.get("info") != null) {
 				info = (TreeMap<String, ?>) fileContent.get("info");
 				if (info.containsKey("files")) {
-					files = (ArrayList<TreeMap<String, ArrayList<byte[]>>>) info.get("files");
+					multiFile = true;
+					files = (ArrayList<TreeMap<String, ?>>) info.get("files");
 				} else if (info.containsKey("length")) {
+					multiFile = false;
 					length = ((BigInteger) info.get("length")).intValue();
 				}
 
@@ -74,16 +76,6 @@ public class Metafile {
 					pieces = (byte[]) info.get("pieces");
 				}
 			}
-
-			/*for (String tmp : announce_list)
-				System.out.println(tmp);*/
-			System.out.println("Comment : " + comment);
-			System.out.println("Created by : " + created_by);
-			System.out.println("Creation date : " + creation_date);
-			System.out.println("Name " + name);
-			System.out.println("Piece length : " + piece_length);
-			//System.out.println(new String(((ArrayList<byte[]>) files.get(1).get("path")).get(0)));
-			System.out.println(new String(DatatypeConverter.printHexBinary(pieces))); // Show SHA1 in hex
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
@@ -95,20 +87,20 @@ public class Metafile {
 		return announce;
 	}
 
-	/*
-	 * public ArrayList<String> getAnnounce_list() { return announce_list; }
-	 */
+	public ArrayList<String> getAnnounce_list() {
+		return announce_list;
+	}
 
 	public String getComment() {
 		return comment;
 	}
 
-	public String getCreated_by() {
-		return created_by;
+	public String getCreatedBy() {
+		return createdBy;
 	}
 
-	public Date getCreation_date() {
-		return creation_date;
+	public Date getCreationDate() {
+		return creationDate;
 	}
 
 	public TreeMap<String, ?> getInfo() {
@@ -131,7 +123,16 @@ public class Metafile {
 		return length;
 	}
 
-	/*
-	 * public ArrayList<TreeMap> getFiles() { return files; }
-	 */
+	public Boolean isMultiFile() {
+		return multiFile;
+	}
+
+	public ArrayList<TreeMap<String, ?>> getFiles() {
+		return files;
+	}
+
+	public Boolean isSingleFile() {
+		return !multiFile;
+	}
+
 }
