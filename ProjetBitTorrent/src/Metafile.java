@@ -37,7 +37,7 @@ public class Metafile {
 		try {
 			bencodeDecoder = new BencodingInputStream(new FileInputStream(file));
 			Map<String, ?> fileContent = bencodeDecoder.readMap();
-			System.out.println(fileContent);
+
 			if (fileContent.get("announce") != null)
 				announce = new String((byte[]) fileContent.get("announce"));
 
