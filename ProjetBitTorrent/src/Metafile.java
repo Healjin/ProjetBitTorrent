@@ -22,6 +22,7 @@ public class Metafile {
 	private String name;
 	private Integer piece_length;
 	private byte[] pieces;
+	private String source;
 
 	// Single file
 	private Integer length;
@@ -33,6 +34,9 @@ public class Metafile {
 
 	@SuppressWarnings({ "unchecked" })
 	public Metafile(String file) {
+		
+		this.source = file;
+		
 		BencodingInputStream bencodeDecoder;
 		try {
 			bencodeDecoder = new BencodingInputStream(new FileInputStream(file));
@@ -47,12 +51,16 @@ public class Metafile {
 				for (int i = 0; i < tmp_list.get(0).size(); i++)
 					announce_list.add(new String((byte[]) tmp_list.get(0).get(i)));
 			}
+			
 			if (fileContent.get("comment") != null)
 				comment = new String((byte[]) fileContent.get("comment"));
+			
 			if (fileContent.get("created_by") != null)
 				createdBy = new String((byte[]) fileContent.get("created_by"));
+			
 			if (fileContent.get("creation date") != null)
 				creationDate = new java.util.Date((long) ((BigInteger) fileContent.get("creation date")).intValue() * 1000);
+			
 			if (fileContent.get("name") != null)
 				name = new String((byte[]) fileContent.get("name"));
 
@@ -135,4 +143,7 @@ public class Metafile {
 		return !multiFile;
 	}
 
+	public String getSource() {
+		return source;
+	}
 }
