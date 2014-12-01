@@ -1,22 +1,20 @@
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
+import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLEncoder;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.TreeMap;
-import java.lang.reflect.Array;
-import java.math.BigInteger;
+
+import org.ardverk.coding.BencodingInputStream;
 
 public class Torrent {
-
+	
 	/*----------------
 		ATTRIBUTES
 	----------------*/
@@ -30,10 +28,12 @@ public class Torrent {
 	private String ip = null;
 	private Integer numWant = null;
 	private String event = null;
-
+	
+	
 	/*-----------------
 		CONSTRUCTOR
 	-----------------*/
+	@SuppressWarnings("unchecked")
 	public Torrent(Metafile file) {
 
 		// Get the torrent file
@@ -127,7 +127,7 @@ public class Torrent {
 			}
 			
 			// Set infoHash SHA-1 value
-			byte[] hash = md.digest();	
+			byte[] hash = md.digest();
 			this.infoHash = encodeURL(javax.xml.bind.DatatypeConverter.printHexBinary(hash));
 			
 		} catch (Exception e) {
@@ -158,9 +158,11 @@ public class Torrent {
 		FUNCTION	: request
 		DESCRIPTION : Send a request to the tracker
 	-------------------------------------------------*/
-	public String request() {
-		
-		StringBuffer response = null;
+	@SuppressWarnings("resource")
+	public Map<String, ?> request() {
+		// Decoder to decode the response from the tracker
+		BencodingInputStream bencodeDecoder = null;
+		Map<String, ?>  responseContent = null;
 		
 		try {
 
@@ -173,34 +175,32 @@ public class Torrent {
 							  "&downloaded=" + this.downloaded + 
 							  "&left=" + this.left + 
 							  "&event=" + this.event +
-							  "&key=12345");
+							  "&key=12345" + 
+							  "&compact=1");
 			
 			HttpURLConnection connexion = (HttpURLConnection) url.openConnection();
 			
 			// Set properties
 			connexion.setRequestMethod("GET");
-
+			
+			connexion.connect();
+			
 			// Send request
 			int code = connexion.getResponseCode();
 			System.out.println(code);
-
-			BufferedReader input = new BufferedReader(new InputStreamReader(connexion.getInputStream()));
-			String line;
-			response = new StringBuffer();
-
-			// Get response
-			while ((line = input.readLine()) != null) {
-				response.append(line);
-			}
-
-			input.close();
 			
+			bencodeDecoder = new BencodingInputStream((InputStream)connexion.getInputStream());
+			
+			responseContent = bencodeDecoder.readMap();
+
+
 		} catch (Exception e) {
+			e.printStackTrace();
 			System.err.println("Error while sending request to tracker");
 		}
 
 		// Return response
-		return response.toString();
+		return responseContent;
 		
 	}
 
