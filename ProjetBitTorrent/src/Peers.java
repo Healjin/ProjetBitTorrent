@@ -61,5 +61,5 @@ public class Peers {
 
 	public ArrayList<Integer> getPeersPort() {
 		return peersPort;
-	}
+	} 
 }

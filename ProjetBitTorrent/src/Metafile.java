@@ -28,7 +28,7 @@ public class Metafile {
 	private Integer length;
 
 	// Multi file
-	private ArrayList<TreeMap<String, ?>> files;
+	private ArrayList<Map<String, ?>> files;
 
 	boolean multiFile = false;
 
@@ -68,7 +68,9 @@ public class Metafile {
 				info = (TreeMap<String, ?>) fileContent.get("info");
 				if (info.containsKey("files")) {
 					multiFile = true;
-					files = (ArrayList<TreeMap<String, ?>>) info.get("files");
+					files = (ArrayList<Map<String, ?>>) info.get("files");
+
+					System.out.println(files);
 				} else if (info.containsKey("length")) {
 					multiFile = false;
 					length = ((BigInteger) info.get("length")).intValue();
@@ -135,7 +137,7 @@ public class Metafile {
 		return multiFile;
 	}
 
-	public ArrayList<TreeMap<String, ?>> getFiles() {
+	public ArrayList<Map<String, ?>> getFiles() {
 		return files;
 	}
 
