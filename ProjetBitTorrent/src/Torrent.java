@@ -18,6 +18,7 @@ public class Torrent {
 		ATTRIBUTES
 	----------------*/
 	private Metafile torrent = null;
+	private String infoHashEncoded = null;
 	private String infoHash = null;
 	private String peerID = null;
 	private Integer port = null;
@@ -125,7 +126,8 @@ public class Torrent {
 
 			// Set infoHash SHA-1 value
 			byte[] hash = md.digest();
-			this.infoHash = encodeURL(javax.xml.bind.DatatypeConverter.printHexBinary(hash));
+			this.infoHash = javax.xml.bind.DatatypeConverter.printHexBinary(hash);
+			this.infoHashEncoded = encodeURL(javax.xml.bind.DatatypeConverter.printHexBinary(hash));
 
 		} catch (Exception e) {
 			System.err.println("Error while getting SHA-1 infoHash");
@@ -164,7 +166,7 @@ public class Torrent {
 		try {
 
 			// Initialize http connexion
-			URL url = new URL(torrent.getAnnounce() + "?info_hash=" + this.infoHash + "&peer_id=" + this.peerID + "&port=" + this.port + "&uploaded="
+			URL url = new URL(torrent.getAnnounce() + "?info_hash=" + this.infoHashEncoded + "&peer_id=" + this.peerID + "&port=" + this.port + "&uploaded="
 					+ this.uploaded + "&downloaded=" + this.downloaded + "&left=" + this.left + "&event=" + this.event + "&key=12345" + "&compact=1");
 
 			System.out.println(url);

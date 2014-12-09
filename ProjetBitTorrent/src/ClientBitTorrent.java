@@ -33,7 +33,7 @@ public class ClientBitTorrent {
 		System.arraycopy(HANDSHAKE.getBytes(), 0, handshake, 0, 20);
 		System.arraycopy(testTorrent.getInfoHash().getBytes(), 0, handshake, 28, 20);
 		System.arraycopy(testTorrent.getPeerID().getBytes(), 0, handshake, 48, 20);
-
+		
 		// Attributs de la requête handshake
 		Socket mSocket;
 		InputStream mIn;
