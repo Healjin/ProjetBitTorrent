@@ -135,7 +135,7 @@ public class Torrent {
 		this.peerID = "01234567890123456789";
 
 		// Set port for listening
-		this.port = 9001;
+		this.port = 9002;
 
 		// Set downloaded, uploaded values
 		this.uploaded = 0;
