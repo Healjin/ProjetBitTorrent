@@ -19,7 +19,7 @@ public class Torrent {
 	----------------*/
 	private Metafile torrent = null;
 	private String infoHashEncoded = null;
-	private String infoHash = null;
+	private byte[] infoHash = null;
 	private String peerID = null;
 	private Integer port = null;
 	private Integer uploaded = null;
@@ -31,7 +31,7 @@ public class Torrent {
 		CONSTRUCTOR
 	-----------------*/
 	@SuppressWarnings("unchecked")
-	public Torrent(Metafile file) {
+	public Torrent(Metafile file, Integer socketPort, String peerID) {
 
 		// Get the torrent file
 		this.torrent = file;
@@ -126,7 +126,7 @@ public class Torrent {
 
 			// Set infoHash SHA-1 value
 			byte[] hash = md.digest();
-			this.infoHash = javax.xml.bind.DatatypeConverter.printHexBinary(hash);
+			this.infoHash = hash;
 			this.infoHashEncoded = encodeURL(javax.xml.bind.DatatypeConverter.printHexBinary(hash));
 
 		} catch (Exception e) {
@@ -134,10 +134,10 @@ public class Torrent {
 		}
 
 		// Set peerID
-		this.peerID = "01234567890123456789";
+		this.peerID = peerID;
 
 		// Set port for listening
-		this.port = 9002;
+		this.port = socketPort;
 
 		// Set downloaded, uploaded values
 		this.uploaded = 0;
@@ -166,8 +166,15 @@ public class Torrent {
 		try {
 
 			// Initialize http connexion
-			URL url = new URL(torrent.getAnnounce() + "?info_hash=" + this.infoHashEncoded + "&peer_id=" + this.peerID + "&port=" + this.port + "&uploaded="
-					+ this.uploaded + "&downloaded=" + this.downloaded + "&left=" + this.left + "&event=" + this.event + "&key=12345" + "&compact=1");
+			URL url = new URL(torrent.getAnnounce() +
+					"?info_hash=" + this.infoHashEncoded + 
+					"&peer_id=" + this.peerID + 
+					"&port=" + this.port + 
+					"&uploaded="	+ this.uploaded + 
+					"&downloaded=" + this.downloaded + 
+					"&left=" + this.left + 
+					"&event=" + this.event + 
+					"&key=12345" + "&compact=1");
 
 			System.out.println(url);
 			HttpURLConnection connexion = (HttpURLConnection) url.openConnection();
@@ -225,7 +232,7 @@ public class Torrent {
 
 	}
 
-	public String getInfoHash(){
+	public byte[] getInfoHash(){
 		return this.infoHash;
 	}
 
