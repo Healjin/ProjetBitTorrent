@@ -2,10 +2,66 @@
 8 décembre 2014
 
 Problème : fichier torrent.java
-Lorsque l'on essaye de créer une arborescence composée de dossiers 
+Lorsque l'on essaye de créer une arborescence composée de dossiers les dossiers ne sont pas créers.
+Même avec la méthode "mkdirs", ils devraient être créer
 
 
-Solution : 
+Solution : Il suffit d'ajouter un "./" dans le path du fichier 
+
+Reproduction : 
+Dans le fichier "Torrent.java" qui contient le constructeur de la classe, remplacez les lignes ligne :
+
+String filePath = "." + File.separator + torrent.getName() + File.separator;
+
+// Get the file path
+for (byte[] data : path) {
+	filePath = filePath + File.separator + new String(data);
+}
+
+Par le code :
+
+String filePath = "";
+
+// Get the file path
+for (byte[] data : path) {
+		filePath = filePath + new String(data);
+}
+
+
+Aucune arborescense de fichier n'est créer par le mkdirs qui est contenu dans la fonction. Tous les fichiers
+sont créer à la racine.
+
+===================================================================================================================
+
+9 décembre 2014
+Problème : 
+Pas de réponse correcte de la part des peers lors de notre handshake.
+
+Solution :
+Notre peer envoyait un infohash éronné, dans la RFC il est spécifié que c'est le même infohash qui est envoyé 
+lors de la requête au tracker, mais en réalité c'est n'est pas toute à fait le même. Lors de la requête au 
+tracker l'infohash est transformer en hexa puis il est "URLEncodé", dans notre cas c'était évident qu'il ne 
+fallait pas faire l'encodage de l'URL, mais on ne savait pas qu'il ne fallait pas le transformer en hexa.
+Donc pour faire une requête correcte l'info hash doit être envoyé en brut, c'est à dire directement via un 
+tableau de byte.
+
+Reproduction :
+
+Dans le fichier "ClientBitTorrent.java,"" remplacer le code suivant : 
+
+PeersManager pm = new PeersManager(peers, metafile.getPieces(), torrent.getInfoHash(), peerID);
+
+Par le code :
+
+PeersManager pm = new PeersManager(peers, metafile.getPieces(), javax.xml.bind.DatatypeConverter.printHexBinary(torrent.getInfoHash()).getBytes(), peerID);
+
+Vous verrez que plus aucun peer ne répondra correctement. Vous aurez des "End of file exception" lorsque vous recevrez quelque chose.
+
+===================================================================================================================
+
+
+
+
 
 
 

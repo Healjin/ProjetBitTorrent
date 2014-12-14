@@ -2,6 +2,7 @@ public class Peer {
 
 	String ip;
 	int port;
+	String peerID;
 	
 	public Peer(String ip, int port) {
 		this.ip = ip;
@@ -19,5 +20,13 @@ public class Peer {
 	@Override
 	public String toString(){
 		return ip + ":" + port;
+	}
+	
+	public void setPeerID(String peerID){
+		this.peerID = peerID;
+	}
+	
+	public String getPeerID(){
+		return peerID;
 	}
 }

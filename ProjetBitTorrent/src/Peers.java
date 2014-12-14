@@ -36,12 +36,14 @@ public class Peers {
 			String ip;
 			int port;
 			for (int i = 0; i < tmpPeers.length; i += 6) {
+				// IP and port are stocked with 6 bytes, the first 4 are the IP and the 2 next are the port.
 				System.arraycopy(tmpPeers, i, tmpIP, 0, 4);
 				System.arraycopy(tmpPeers, 4 + i, tmpPort, 0, 2);
 
 				ip = new String((int) (tmpIP[0] & 0xFF) + "." + (int) (tmpIP[1] & 0xFF) + "." + (int) (tmpIP[2] & 0xFF) + "."
 						+ (int) (tmpIP[3] & 0xFF));
 				port = ((tmpPort[0] & 0xFF) << 8) | (tmpPort[1] & 0xFF);
+			
 				peers.add(new Peer(ip, port));
 			}
 		}

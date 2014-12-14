@@ -186,7 +186,6 @@ public class Torrent {
 
 			// Send request
 			int code = connexion.getResponseCode();
-			System.out.println(code);
 
 			bencodeDecoder = new BencodingInputStream((InputStream) connexion.getInputStream());
 

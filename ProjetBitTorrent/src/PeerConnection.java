@@ -1,5 +1,6 @@
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -8,7 +9,10 @@ import java.net.Socket;
 import java.util.Arrays;
 
 public class PeerConnection {
-	int[] piecesDownloaded; // 0 = non download, 1 = en cours , 2 = fini
+	final int TIME_OUT_CONNECTION = 5000;
+	final int TIME_OUT_HANDSHAKE = 5000;
+
+	int[] piecesDownloaded; // 0 = non downloaded, 1 = in progress , 2 = download finished
 	byte[] infoHash;
 	String peerID;
 	byte[] pieces;
@@ -16,64 +20,82 @@ public class PeerConnection {
 
 	Socket socket;
 
-	public PeerConnection(Peer peer, byte[] pieces, int[] piecesDownloaded, byte[] infoHash, String peerID) {
+	public PeerConnection(Peer peer, byte[] pieces, int[] piecesDownloaded, byte[] infoHash, String peerID) throws IOException {
 		this.peer = peer;
 		this.piecesDownloaded = piecesDownloaded;
 		this.pieces = pieces;
 		this.infoHash = infoHash;
 		this.peerID = peerID;
-		
 
-		try {
-			System.out.println("Connection to " + peer.getIP() + ":" + peer.getPort());
-			socket = new Socket();
-			socket.connect(new InetSocketAddress(peer.getIP(), peer.getPort()), 5000);
-			System.out.println("Connected to peer");
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+		System.out.print("=========================================================" + "\n");
+		System.out.println("Connection to " + peer.toString());
+		System.out.flush();
+		socket = new Socket();
+		socket.connect(new InetSocketAddress(peer.getIP(), peer.getPort()), TIME_OUT_CONNECTION);
+		System.out.println("Connected to peer " + peer.toString());
 	}
 
-	public void handshake() {
+	public Boolean handshake() {
 
-		// Création de la trame handshake
 		byte[] handshake = new byte[68];
 
+		// Creation handshake frame
 		final String HANDSHAKE = ((char) 19) + "BitTorrent protocol";
 		System.arraycopy(HANDSHAKE.getBytes(), 0, handshake, 0, 20);
 		System.arraycopy(infoHash, 0, handshake, 28, 20);
 		System.arraycopy(peerID.getBytes(), 0, handshake, 48, 20);
 
-		// Attributs de la requête handshake
+		// Streams to interact with the socket
 		InputStream mIn;
 		OutputStream mOut;
 		DataInputStream mDataIn;
 		DataOutputStream mDataOut;
 
 		try {
+			// Retrieve all socket streams
 			mOut = socket.getOutputStream();
 			mIn = socket.getInputStream();
 			mDataIn = new DataInputStream(mIn);
 			mDataOut = new DataOutputStream(mOut);
 
-			// Send handshake
-			socket.setSoTimeout(5000);
+			// Set time out value
+			socket.setSoTimeout(TIME_OUT_HANDSHAKE);
 			System.out.println("sending handshake");
+			// Send handshake
 			mDataOut.write(handshake);
 			mDataOut.flush();
 
 			// Wait response
 			byte[] response = new byte[68];
 			System.out.println("Waiting response");
+			System.out.flush();
+
+			// Read response from peer
 			mDataIn.readFully(response);
+
 			System.out.println("Response received");
-			System.out.println(new String(response));
+			System.out.println(response.length);
 
 			byte[] responseInfoHash = Arrays.copyOfRange(response, 28, 48);
+			byte sizeProtocolName = response[0];
 
-			System.out.println(Arrays.equals(infoHash, responseInfoHash));
-		} catch (Exception e) {
-			e.printStackTrace();
+			// Make sure that is the bittorrent protocol
+			if ((sizeProtocolName == 19 ) && new String(response).toLowerCase().contains("bittorrent protocol")) {
+				// If the hash send is the same as the hash received
+				if (Arrays.equals(infoHash, responseInfoHash)) {
+					// Extract peer ID and store it
+					String peerID = new String(Arrays.copyOfRange(response, 48, 68));
+					peer.setPeerID(peerID);
+					return true; // Handshake is correct.
+				}
+			}
+			return false; // Handshake is incorrect
+		} catch (EOFException e) {
+			System.out.print("Data from " + peer.toString() + " are corrupted." + "\n");
+			return false;
+		} catch (IOException e) {
+			System.out.print("Error while tryin to read data input stream from " + peer.toString() + "\n");
+			return false;
 		}
 	}
 
