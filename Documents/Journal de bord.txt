@@ -1,0 +1,94 @@
+Journal de bord de David Da Silva Andrade
+
+9 novembre 2014 - Da Silva
+- Prise de note de la RFC sur le bittorrent
+
+10 novembre 2014 - Da Silva & Magnin
+- Recherche d'un librairie pour decodé les données reçues en bencode
+- Création d'une classe "BencodeDecoder.java"
+- Création du constructeur
+
+15 novembre 2014 - Da Silva
+- Suppression de la classe "BencodeDecoder.java"
+- Utilisation de la librairie bee-encode.jar : https://code.google.com/p/bee-encode/
+- Création d'une classe MetaFile.java, elle permetra de faire les choses suivantes :
+	- Lire le fichier avec l'extension torrent
+	- Récupérer toutes les informations nécessaires, dont voici la liste :
+		String announce;
+		ArrayList<String> announce_list;
+		String comment;
+		String createdBy;
+		Date creationDate;
+		TreeMap<String, ?> info; // Dictionary
+		String name;
+		Integer piece_length;
+		byte[] pieces;
+		String source;
+	- Permet de savoir si le fichier est un single file ou un multifile
+
+25 novembre 2014 - Magnin
+- Ajout du classe torrent.java utilisant un objet MetaFile au constructeur
+- Fonctionnalités :
+	- Créer les fichiers temporaires à télécharger (allocation mémoire sur le disque)
+	- Construire la requête vers le tracker (avec calcul du infoHash)
+	- Envoyer une requête vers le tracker et récupérer la réponse
+- Utilisation de la fonction encodeURL trouvée sur : 
+	http://stackoverflow.com/questions/1019837/java-encode-sha-1-byte-array
+
+26 novembre 2014 - Da Silva 
+- Lecture du fichier et decodage torrent fonctionnelle.
+	-> Manque la lecture du champs Files pour le mode multi files
+
+30 novembre 2014 - Da Silva
+- Mise en place de la gestion multifile des torrents dans la classe MetaFile.java
+- Actualisation des getters de la classe MetaFile
+
+30 novembre 2014 - Magnin
+- Mise à jour de la classe torrent.java
+- Prise en charge des torrents multifiles (création de l'arborescence complète)
+
+1 décembre 2014 - Da Silva
+- Nouvelle classe "Peers.java" qui permet la lecture des peers depuis la réponse du trackeur.
+- Attributs de la classe Peers.java : 
+	Integer interval;
+	Integer seeders;
+	Integer leechers;
+	ArrayList<String> peersIP;
+	ArrayList<Integer> peersPort;
+- Mise en place des getters pour les atributs listés
+
+8 décembre 2014 - Da Silva & Magnin
+- Bugfix de la création de l'arborescense lors des fichiers multifiles. 
+- Mise en place d'un dossier contenant tous les fichiers pour le cas multifiles.
+- Lecture des peers confirmée correcte ( pour les numéros de port ).
+- Mise en place d'un bout de code test pour les peers dans le "main" fichier.
+- Ajout du fichier bugs.txt qui permet le suivi des bugs dans le projet.
+
+9 décembre 2014 - Da Silva & Magnin
+- Mise en place d'un boucle de test qui permet de se connecter sur TOUS les peers les uns après les autres.
+- Si la connection échoue (après max 3s pour le read et 2s pour la connection au socket) on passe au peer suivant.
+- Ajout de la gestion des exception.
+- Ajout de code permettant d'affiche les états de connections vers les peers.
+
+10 décembre 2014 - Da Silva & Magnin
+Nouvelle structure du code : 
+- Une classe Peer qui contient l'ip et le port d'un peer individuel.
+- Une classe PeersManager qui gère les connections
+- Une classe PeersConnection qui va gérer chaque communication vers les peers.
+- Nettoyage du main.
+- Meilleur affichage des états de connection vers les peers.
+
+14 décembre 2014 - Da Silva
+Mise en place d'une meilleur confirmation du handshake:
+- Confirme si le hash est le même qui à été envoyé
+- Confirme si c'est bien le protocole biturent
+- Confirme que le nom du protocole est bien sur 19 bytes
+Mise à jour du fichier bugs.txt avec les derniers bugs obtenus.
+Lorsque l'on se connecte à un peer et que la connection échoue celle-ci jète une exception qui doit être gérée lors de la création de la classe PeerConnection.
+Ajout de quelques constantes afin de facilité la modification du code (comme par exemple le peerID et le numéro de port)
+
+
+
+
+
+
