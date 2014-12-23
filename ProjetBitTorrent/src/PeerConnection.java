@@ -8,6 +8,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.Arrays;
 import java.nio.ByteBuffer;
+import java.io.ByteArrayOutputStream;
 
 public class PeerConnection extends Thread {
 	
@@ -15,13 +16,14 @@ public class PeerConnection extends Thread {
 	final int TIME_OUT_HANDSHAKE = 5000;
 
 	int[] piecesDownloaded; // 0 = non downloaded, 1 = in progress , 2 = download finished
+	int[] remotePiecesAvailables; // 0 = not available, 1 = available
 	byte[] infoHash;
 	String peerID;
 	byte[] pieces;
 	Peer peer;
 	Socket socket;
 	Boolean handshaken = false;
-	Boolean choked = false;
+	Boolean choked = true;
 	Boolean interested = false;
 
 	public PeerConnection(Peer peer, byte[] pieces, int[] piecesDownloaded, byte[] infoHash, String peerID) throws IOException {
@@ -29,6 +31,7 @@ public class PeerConnection extends Thread {
 		// Initialize attributes
 		this.peer = peer;
 		this.piecesDownloaded = piecesDownloaded;
+		this.remotePiecesAvailables = new int[piecesDownloaded.length];
 		this.pieces = pieces;
 		this.infoHash = infoHash;
 		this.peerID = peerID;
@@ -127,8 +130,35 @@ public class PeerConnection extends Thread {
 		ReceiveMessages rm = new ReceiveMessages();
 		rm.start();
 		
-	}
+		try {
+			
+			byte[] bitfield = new byte[(int) Math.ceil(piecesDownloaded.length / 8)];
+
+			// Set the bitfield
+			for (int i = 0; i < piecesDownloaded.length; i++) {
+				if (piecesDownloaded[i] == 1) {
+					setBit(bitfield, i, piecesDownloaded[i]);
+				}
+			}
+
+			// Construct message
+			ByteArrayOutputStream out = new ByteArrayOutputStream();
+			byte[] msgLength = ByteBuffer.allocate(4).putInt(bitfield.length).array();
+			out.write(msgLength);
+			out.write(5);
+			out.write(bitfield);
+			out.flush();
+			
+			// Send bitfield
+			SendMessage sm = new SendMessage(out.toByteArray());
+			sm.start();
+			
+		} catch (Exception e) {
+			System.err.println("Error while sending bitfield");
+		}
 		
+	}
+	
 	public class ProcessMessage extends Thread {
 		
 		byte[] msg;
@@ -139,10 +169,81 @@ public class PeerConnection extends Thread {
 		
 		public void run() {
 			
-			System.out.println("New message with ID : " + msg[4]);
+			byte id = msg[4];
+			System.out.println("New message with ID : " + id);
+			
+			switch (id) {
+				
+				case 0:
+				
+					choked = true;
+					break;
+				
+				case 1:
+				
+					choked = false;
+					break;
+				
+				case 2:
+				
+					interested = true;
+					break;
+				
+				case 3:
+				
+					interested = false;
+					break;
+				
+				case 4:
+					
+					// Actualise the remotePiecesAvailables array
+					byte index = msg[5];
+					if (index >= 0 && index <= remotePiecesAvailables.length) {
+						remotePiecesAvailables[index] = 1;
+					}
+				
+					break;
+				
+				case 5:
+				
+					// Set the remotePiecesAvailables array
+					byte[] bitfield = Arrays.copyOfRange(msg, 5, msg.length);
+					for (int i = 0; i < remotePiecesAvailables.length; i++) {
+						remotePiecesAvailables[i] = getBit(bitfield, i);
+					}
+				
+					break;
+				
+				case 6:
+					break;
+				case 7:
+					break;
+				case 8:
+					break;
+				
+			}
 
 		}
 		
+	}
+
+	// http://www.herongyang.com/Java/Bit-String-Get-Bit-from-Byte-Array.html
+	public int getBit(byte[] data, int pos) {
+		int posByte = pos / 8; 
+		int posBit = pos % 8;
+		byte valByte = data[posByte];
+		int valInt = valByte >> (8 - (posBit + 1)) & 0x0001;
+		return valInt;
+	}
+	
+	// http://www.herongyang.com/Java/Bit-String-Set-Bit-to-Byte-Array.html
+	private static void setBit(byte[] data, int pos, int val) {
+		int posByte = pos/8; 
+		int posBit = pos%8;
+		byte oldByte = data[posByte];
+		oldByte = (byte) (((0xFF7F>>posBit) & oldByte) & 0x00FF);
+		byte newByte = (byte) ((val<<(8-(posBit+1))) | oldByte);
+		data[posByte] = newByte;
 	}
 	
 	public class ReceiveMessages extends Thread {
@@ -172,7 +273,6 @@ public class PeerConnection extends Thread {
 							// Get the length of the message
 							if (bb.position() == 4) {
 								msgLength = bb.getInt(0);
-								System.out.println("Message length : " + bb.getInt(0));
 							}
 							
 							// Avoid "keep-alive" messages
@@ -197,7 +297,7 @@ public class PeerConnection extends Thread {
 				}
 				
 			} catch (Exception e) {
-				System.err.println("Error while reading socket");
+				System.err.println("Error while listening messages");
 			}
 
 		}
@@ -206,7 +306,25 @@ public class PeerConnection extends Thread {
 	
 	public class SendMessage extends Thread {
 		
+		byte[] msg;
+		
+		public SendMessage(byte[] msg) {
+			this.msg = msg;
+		}
+		
 		public void run() {
+			
+			try {
+				
+				// Send message
+				DataOutputStream output = new DataOutputStream(socket.getOutputStream());
+				output.write(msg);
+				output.flush();
+				System.out.println("Send message with ID : " + msg[4]);
+				
+			} catch (Exception e) {
+				System.err.println("Error while sending message");
+			}
 			
 		}
 		

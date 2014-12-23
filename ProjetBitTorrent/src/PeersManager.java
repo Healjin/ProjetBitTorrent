@@ -17,15 +17,8 @@ public class PeersManager {
 		this.pieces = pieces;
 		this.infoHash = infoHash;
 		this.peerID = peerID;
-
-		piecesDownloaded = new int[pieces.length / 20];
-		
-		// All pieces set to non downloaded
-		for (int i = 0; i < piecesDownloaded.length; i++) {
-			piecesDownloaded[i] = 0;
-		}
-		
-		peerConnections = new ArrayList<PeerConnection>();
+		this.piecesDownloaded = new int[pieces.length / 20];
+		this.peerConnections = new ArrayList<PeerConnection>();
 
 	}
 
