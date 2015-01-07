@@ -7,14 +7,14 @@ public class ClientBitTorrent {
 
 	public static void main(String[] args) {
 
-		Metafile metafile = new Metafile("../../Documents/test2.torrent");
+		Metafile metafile = new Metafile("../Documents/test1.torrent");
 
 		Torrent torrent = new Torrent(metafile, socketPort, peerID);
 		Map<String, ?> responseTracker = torrent.request();
 		System.out.println(responseTracker);
 		Peers peers = new Peers(responseTracker);
 		System.out.println("Number of peers : " + peers.getPeers().size());
-		PeersManager pm = new PeersManager(peers, metafile.getPieces(), torrent.getInfoHash(), peerID);
+		PeersManager pm = new PeersManager(peers, metafile, torrent.getInfoHash(), peerID);
 		pm.startDownload();
 		
 		

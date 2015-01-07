@@ -12,30 +12,31 @@ import java.io.ByteArrayOutputStream;
 
 public class PeerConnection extends Thread {
 	
-	final int TIME_OUT_CONNECTION = 5000;
-	final int TIME_OUT_HANDSHAKE = 5000;
+	final int TIME_OUT_CONNECTION = 2000;
+	final int TIME_OUT_HANDSHAKE = 2000;
+	final int BUFFER_SIZE_INPUT = 65536;
 
 	int[] piecesDownloaded; // 0 = non downloaded, 1 = in progress , 2 = download finished
 	int[] remotePiecesAvailables; // 0 = not available, 1 = available
 	byte[] infoHash;
 	String peerID;
-	byte[] pieces;
+	Metafile metafile;
 	Peer peer;
 	Socket socket;
 	Boolean handshaken = false;
 	Boolean choked = true;
 	Boolean interested = false;
 
-	public PeerConnection(Peer peer, byte[] pieces, int[] piecesDownloaded, byte[] infoHash, String peerID) throws IOException {
+	public PeerConnection(Peer peer, Metafile metafile,int[] piecesDownloaded, byte[] infoHash, String peerID) throws IOException {
 		
 		// Initialize attributes
 		this.peer = peer;
 		this.piecesDownloaded = piecesDownloaded;
 		this.remotePiecesAvailables = new int[piecesDownloaded.length];
-		this.pieces = pieces;
+		this.metafile = metafile;
 		this.infoHash = infoHash;
 		this.peerID = peerID;
-
+		
 		// Initlialize connection to peer
 		System.out.print("=========================================================" + "\n");
 		System.out.println("Connection to " + peer.toString());
@@ -124,13 +125,23 @@ public class PeerConnection extends Thread {
 		
 	}
 	
+	// Return -1 if all pieces available on the peer are downloaded
+	private int getFirstPieceMissing(){
+		for (int i = 0; i < piecesDownloaded.length; i++) {
+			if((piecesDownloaded[i] == 0) && (remotePiecesAvailables[i] == 1)){
+				return i;
+			}
+		}	
+		return -1; // No pieces missing
+	}
+	
 	public void run() {
 		
 		// Start listening to peer
 		ReceiveMessages rm = new ReceiveMessages();
 		rm.start();
 		
-		try {
+		/*try {
 			
 			byte[] bitfield = new byte[(int) Math.ceil(piecesDownloaded.length / 8)];
 
@@ -155,6 +166,60 @@ public class PeerConnection extends Thread {
 			
 		} catch (Exception e) {
 			System.err.println("Error while sending bitfield");
+		}*/		
+		
+		byte[] interested = new byte[5];
+		byte[] msgLength2 = ByteBuffer.allocate(4).putInt(1).array();
+		System.arraycopy(msgLength2, 0, interested, 0, 4);
+		interested[4] = 2;
+		
+		ByteArrayOutputStream out2 = new ByteArrayOutputStream();
+		try {
+			out2.write(interested);
+			out2.flush();
+		} catch (IOException e) {
+			System.err.println("Error while sending request");			
+		}
+		// Send bitfield
+		SendMessage sm2 = new SendMessage(out2.toByteArray());
+		sm2.start();
+		
+		
+		int indexPieceMissing = -1;
+		while(true){
+			try {
+				Thread.sleep(4000);
+			} catch (InterruptedException e) {
+				System.err.println("Error while trying to sleep");
+			}
+			
+			if((choked == false) && ((indexPieceMissing = getFirstPieceMissing()) != -1))
+			{
+				// Frame to request a piece
+				byte[] request = new byte[17];
+				byte[] index = 	ByteBuffer.allocate(4).putInt(indexPieceMissing).array();
+				byte[] begin = 	ByteBuffer.allocate(4).putInt(0).array();
+				byte[] length = ByteBuffer.allocate(4).putInt(16384).array();
+				
+				ByteArrayOutputStream out = new ByteArrayOutputStream();
+				byte[] msgLength = ByteBuffer.allocate(4).putInt(13).array();
+
+				System.arraycopy(msgLength, 0, request, 0, 4);
+				request[4] = 6;
+				System.arraycopy(index, 0, request, 5, 4);
+				System.arraycopy(begin, 0, request, 9, 4);
+				System.arraycopy(length, 0, request, 13, 4);
+				
+				try {
+					out.write(request);
+					out.flush();
+				} catch (IOException e) {
+					System.err.println("Error while sending request");			
+				}
+				// Send bitfield
+				SendMessage sm = new SendMessage(out.toByteArray());
+				sm.start();
+			}
 		}
 		
 	}
@@ -167,8 +232,7 @@ public class PeerConnection extends Thread {
 			this.msg = msg;
 		}
 		
-		public void run() {
-			
+		public void run() {	
 			byte id = msg[4];
 			System.out.println("New message with ID : " + id);
 			
@@ -217,6 +281,14 @@ public class PeerConnection extends Thread {
 				case 6:
 					break;
 				case 7:
+					byte[] indexPiece = new byte[4];
+					byte[] begin = new byte[4];
+					byte[] length = new byte[4];
+					
+					System.arraycopy(msg, 5, indexPiece, 0, 4);
+					System.arraycopy(msg, 9, begin, 0, 4);
+					System.arraycopy(msg, 13, length, 0, 4);
+							
 					break;
 				case 8:
 					break;
@@ -252,13 +324,13 @@ public class PeerConnection extends Thread {
 			
 			try {
 
-				ByteBuffer bb = ByteBuffer.allocate(1500);
+				ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE_INPUT);
 				int msgLength = 1500;
 				DataInputStream input = new DataInputStream(socket.getInputStream());
 				System.out.println("Start listening to messages");
 				
 				while (true) {
-
+					Thread.sleep(50);
 					// Check if some data is available
 					int size = input.available();
 					

@@ -5,20 +5,20 @@ import java.util.ArrayList;
 public class PeersManager {
 	
 	Peers peers;
-	byte[] pieces;
 	int[] piecesDownloaded; // 0 = non downloaded, 1 = in progress , 2 = download finished
 	byte[] infoHash;
 	String peerID;
+	Metafile metafile;
 	ArrayList<PeerConnection> peerConnections;
 
-	public PeersManager(Peers peers, byte[] pieces, byte[] infoHash, String peerID) {
+	public PeersManager(Peers peers, Metafile metafile, byte[] infoHash, String peerID) {
 
 		this.peers = peers;
-		this.pieces = pieces;
 		this.infoHash = infoHash;
 		this.peerID = peerID;
-		this.piecesDownloaded = new int[pieces.length / 20];
+		this.piecesDownloaded = new int[metafile.getPieces().length / 20];
 		this.peerConnections = new ArrayList<PeerConnection>();
+		this.metafile = metafile;
 
 	}
 
@@ -32,7 +32,7 @@ public class PeersManager {
 			try {
 				
 				// Throw exception if connection drop out
-				PeerConnection peerConnection = new PeerConnection(peer, pieces, piecesDownloaded, infoHash, peerID);
+				PeerConnection peerConnection = new PeerConnection(peer, metafile, piecesDownloaded, infoHash, peerID);
 				
 				// If the handshake worked as expected, return true.
 				if (peerConnection.handshaken) {
