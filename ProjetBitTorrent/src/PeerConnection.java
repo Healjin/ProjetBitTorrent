@@ -9,12 +9,18 @@ import java.net.Socket;
 import java.util.Arrays;
 import java.nio.ByteBuffer;
 import java.io.ByteArrayOutputStream;
+import java.io.BufferedOutputStream;
+import java.nio.file.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.security.MessageDigest;
 
 public class PeerConnection extends Thread {
 	
 	final int TIME_OUT_CONNECTION = 2000;
 	final int TIME_OUT_HANDSHAKE = 2000;
 	final int BUFFER_SIZE_INPUT = 65536;
+	final int BLOCK_SIZE = 16384;
 
 	int[] piecesDownloaded; // 0 = non downloaded, 1 = in progress , 2 = download finished
 	int[] remotePiecesAvailables; // 0 = not available, 1 = available
@@ -180,6 +186,7 @@ public class PeerConnection extends Thread {
 		} catch (IOException e) {
 			System.err.println("Error while sending request");			
 		}
+		
 		// Send bitfield
 		SendMessage sm2 = new SendMessage(out2.toByteArray());
 		sm2.start();
@@ -187,6 +194,7 @@ public class PeerConnection extends Thread {
 		
 		int indexPieceMissing = -1;
 		while(true){
+			
 			try {
 				Thread.sleep(4000);
 			} catch (InterruptedException e) {
@@ -195,31 +203,71 @@ public class PeerConnection extends Thread {
 			
 			if((choked == false) && ((indexPieceMissing = getFirstPieceMissing()) != -1))
 			{
-				// Frame to request a piece
-				byte[] request = new byte[17];
-				byte[] index = 	ByteBuffer.allocate(4).putInt(indexPieceMissing).array();
-				byte[] begin = 	ByteBuffer.allocate(4).putInt(0).array();
-				byte[] length = ByteBuffer.allocate(4).putInt(16384).array();
+				int blocksCount = (int) Math.floor(metafile.getPiece_length() / BLOCK_SIZE);
+				int rest = metafile.getPiece_length() % BLOCK_SIZE;
 				
-				ByteArrayOutputStream out = new ByteArrayOutputStream();
-				byte[] msgLength = ByteBuffer.allocate(4).putInt(13).array();
+				for (int i = 0; i < blocksCount; i++) {
+				
+					// Constructs the request
+					byte[] request = new byte[17];
+					byte[] msgLength = ByteBuffer.allocate(4).putInt(13).array();
+					byte[] index = 	ByteBuffer.allocate(4).putInt(indexPieceMissing).array();
+					byte[] begin = 	ByteBuffer.allocate(4).putInt(i * BLOCK_SIZE).array();
+					byte[] length = ByteBuffer.allocate(4).putInt(BLOCK_SIZE).array();	
 
-				System.arraycopy(msgLength, 0, request, 0, 4);
-				request[4] = 6;
-				System.arraycopy(index, 0, request, 5, 4);
-				System.arraycopy(begin, 0, request, 9, 4);
-				System.arraycopy(length, 0, request, 13, 4);
-				
-				try {
-					out.write(request);
-					out.flush();
-				} catch (IOException e) {
-					System.err.println("Error while sending request");			
+					System.arraycopy(msgLength, 0, request, 0, 4);
+					request[4] = 6;
+					System.arraycopy(index, 0, request, 5, 4);
+					System.arraycopy(begin, 0, request, 9, 4);
+					System.arraycopy(length, 0, request, 13, 4);
+					
+					ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+					try {
+						out.write(request);
+						out.flush();
+					} catch (IOException e) {
+						System.err.println("Error while sending request");			
+					}
+					
+					// Send request
+					SendMessage sm = new SendMessage(out.toByteArray());
+					sm.start();
+					
 				}
-				// Send bitfield
-				SendMessage sm = new SendMessage(out.toByteArray());
-				sm.start();
+				
+				if (rest != 0) {
+						
+					// Constructs the request
+					byte[] request = new byte[17];
+					byte[] msgLength = ByteBuffer.allocate(4).putInt(13).array();
+					byte[] index = 	ByteBuffer.allocate(4).putInt(indexPieceMissing).array();
+					byte[] begin = 	ByteBuffer.allocate(4).putInt(blocksCount * BLOCK_SIZE).array();
+					byte[] length = ByteBuffer.allocate(4).putInt(rest).array();	
+
+					System.arraycopy(msgLength, 0, request, 0, 4);
+					request[4] = 6;
+					System.arraycopy(index, 0, request, 5, 4);
+					System.arraycopy(begin, 0, request, 9, 4);
+					System.arraycopy(length, 0, request, 13, 4);
+					
+					ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+					try {
+						out.write(request);
+						out.flush();
+					} catch (IOException e) {
+						System.err.println("Error while sending request");			
+					}
+					
+					// Send request
+					SendMessage sm = new SendMessage(out.toByteArray());
+					sm.start();
+					
+				}
+				
 			}
+			
 		}
 		
 	}
@@ -281,15 +329,80 @@ public class PeerConnection extends Thread {
 				case 6:
 					break;
 				case 7:
-					byte[] indexPiece = new byte[4];
+
+					// Gets the block's size
+					byte[] msgLength = new byte[4];
+					System.arraycopy(msg, 0, msgLength, 0, 4);
+					int blockLength = ByteBuffer.wrap(msgLength).getInt() - 13;
+				
+					byte[] tmpIndexPiece = new byte[4];
 					byte[] begin = new byte[4];
-					byte[] length = new byte[4];
+					byte[] block = new byte[blockLength];
 					
-					System.arraycopy(msg, 5, indexPiece, 0, 4);
+					System.arraycopy(msg, 5, tmpIndexPiece, 0, 4);
 					System.arraycopy(msg, 9, begin, 0, 4);
-					System.arraycopy(msg, 13, length, 0, 4);
+					System.arraycopy(msg, 13, block, 0, 4);
+				
+					if (metafile.isSingleFile()) {
+						
+						File file = new File(metafile.getName());
+						Path path = Paths.get(metafile.getName());
+						int indexPiece = ByteBuffer.wrap(tmpIndexPiece).getInt();
+						
+						try {
 							
+							// Writes the block
+							OutputStream out = new BufferedOutputStream(Files.newOutputStream(path));
+							out.write(block, indexPiece * BLOCK_SIZE, blockLength);
+							
+						} catch (Exception e) {
+							System.err.println("Error while writing to file");
+						}
+						
+						try {
+							
+							FileInputStream fin = new FileInputStream(file);
+							int pieceLength = metafile.getPiece_length();
+							
+							// This is the last piece and hes's smaller than others
+							if (indexPiece * pieceLength + pieceLength > metafile.getLength()) {
+								pieceLength = metafile.getLength() - indexPiece * pieceLength;
+							}
+							
+							// Gets the piece
+							byte[] piece = new byte[pieceLength];
+							fin.read(piece, indexPiece * pieceLength, pieceLength);
+							
+							// Gets the sha1 of the piece
+							MessageDigest md = MessageDigest.getInstance("SHA-1");
+							md.update(piece);
+							byte[] pieceHash = md.digest();
+							
+							// Gets the real sha1
+							byte[] realPieceHash = new byte[pieceLength];
+							System.arraycopy(metafile.getPieces(), indexPiece * pieceLength, realPieceHash, 0, 20);
+							
+							// Checks the sha1
+							if (realPieceHash.equals(pieceHash)) {
+								piecesDownloaded[indexPiece] = 2;
+								System.out.println("Piece " + indexPiece + " downloaded successfully");	
+							}
+							
+						} catch (Exception e) {
+							System.err.println("Error while checking piece's sha1");
+						}
+						
+						
+					} else {
+						
+						System.out.println("Multifiles not supported");
+						
+					}
+				
+				
+				
 					break;
+				
 				case 8:
 					break;
 				
