@@ -3,6 +3,8 @@ import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 
 public class PeersManager {
+
+	final int MAX_CONNECTIONS = 2;
 	
 	Peers peers;
 	int[] piecesDownloaded; // 0 = non downloaded, 1 = in progress , 2 = download finished
@@ -25,12 +27,16 @@ public class PeersManager {
 	public void startDownload() {
 		
 		ArrayList<Peer> listPeers = peers.getPeers();
+		int connectionsCount = 0;
 
 		// Do all handhsakes
 		for (Peer peer : listPeers) {
 			
 			try {
 				
+				if (connectionsCount >= MAX_CONNECTIONS) {
+					break;
+				}
 				// Throw exception if connection drop out
 				PeerConnection peerConnection = new PeerConnection(peer, metafile, piecesDownloaded, infoHash, peerID);
 				
@@ -40,10 +46,10 @@ public class PeersManager {
 					// At this point we know that peerConnection is valid because the connection worked and the handshake too
 					this.peerConnections.add(peerConnection);
 					System.out.println("Handshake OK");
-					
+
 					peerConnection.start();
-					break;
-					
+					connectionsCount++;
+
 				} // else, discard connection
 				
 			} catch (SocketTimeoutException e) {

@@ -11,9 +11,9 @@ import java.nio.ByteBuffer;
 import java.io.ByteArrayOutputStream;
 import java.io.BufferedOutputStream;
 import java.nio.file.*;
-import java.io.File;
 import java.io.FileInputStream;
 import java.security.MessageDigest;
+import java.io.RandomAccessFile;
 
 public class PeerConnection extends Thread {
 	
@@ -32,8 +32,10 @@ public class PeerConnection extends Thread {
 	Boolean handshaken = false;
 	Boolean choked = true;
 	Boolean interested = false;
+	int blocksReceived = 0;
+	byte[] piece;
 
-	public PeerConnection(Peer peer, Metafile metafile,int[] piecesDownloaded, byte[] infoHash, String peerID) throws IOException {
+	public PeerConnection(Peer peer, Metafile metafile, int[] piecesDownloaded, byte[] infoHash, String peerID) throws IOException {
 		
 		// Initialize attributes
 		this.peer = peer;
@@ -191,20 +193,41 @@ public class PeerConnection extends Thread {
 		SendMessage sm2 = new SendMessage(out2.toByteArray());
 		sm2.start();
 		
-		
 		int indexPieceMissing = -1;
-		while(true){
+		int blocksCount = (int) Math.floor(metafile.getPiece_length() / BLOCK_SIZE);
+		int rest = metafile.getPiece_length() % BLOCK_SIZE;
+		
+		while(true) {
 			
 			try {
-				Thread.sleep(4000);
+				Thread.sleep(50);
 			} catch (InterruptedException e) {
 				System.err.println("Error while trying to sleep");
 			}
+
+			int totalBlocksCount = blocksCount;
+			blocksReceived = 0;
 			
 			if((choked == false) && ((indexPieceMissing = getFirstPieceMissing()) != -1))
 			{
-				int blocksCount = (int) Math.floor(metafile.getPiece_length() / BLOCK_SIZE);
-				int rest = metafile.getPiece_length() % BLOCK_SIZE;
+
+				System.out.println("Piece " + indexPieceMissing + " in progress ...");
+
+				piecesDownloaded[indexPieceMissing] = 1;
+
+				int pieceLength = metafile.getPiece_length();
+				int lastPieceLength;
+				
+				if (indexPieceMissing == piecesDownloaded.length - 1) {
+					if ((lastPieceLength = metafile.getLength() % pieceLength) != 0) {
+						pieceLength = lastPieceLength;
+					}
+				}
+				
+				piece = new byte[pieceLength];
+				for (int i = 0; i < pieceLength; i++) {
+					piece[i] = (byte) 0xFF;
+				}
 				
 				for (int i = 0; i < blocksCount; i++) {
 				
@@ -237,6 +260,8 @@ public class PeerConnection extends Thread {
 				}
 				
 				if (rest != 0) {
+					
+					totalBlocksCount++;
 						
 					// Constructs the request
 					byte[] request = new byte[17];
@@ -266,6 +291,49 @@ public class PeerConnection extends Thread {
 					
 				}
 				
+				while (blocksReceived < totalBlocksCount) {
+					try {
+						Thread.sleep(50);
+					} catch (InterruptedException e) {
+						System.err.println("Error while trying to sleep");
+					}	
+				}
+				
+				try {
+					
+					// Gets the sha1 of the piece
+					MessageDigest md = MessageDigest.getInstance("SHA-1");
+					md.update(piece);
+					byte[] pieceHash = md.digest();
+
+					// Gets the real sha1
+					byte[] realPieceHash = new byte[20];
+					System.arraycopy(metafile.getPieces(), indexPieceMissing * 20, realPieceHash, 0, 20);
+
+					// Checks the sha1
+					if (java.util.Arrays.equals(realPieceHash,pieceHash)) {
+						piecesDownloaded[indexPieceMissing] = 2;
+						System.out.println("Piece " + indexPieceMissing + " downloaded successfully");
+					} else {
+						piecesDownloaded[indexPieceMissing] = 0;
+						System.out.println("Piece " + indexPieceMissing + " not downloaded");
+					}
+
+					try {
+							
+						// Writes the piece on file
+						RandomAccessFile tmp = new RandomAccessFile(metafile.getName(), "rw");
+						tmp.seek(indexPieceMissing * metafile.getPiece_length());
+						tmp.write(piece, 0, pieceLength);
+						
+					} catch (Exception e) {
+						System.err.println("Error while writing to file");
+					}
+
+				} catch (Exception e) {
+					System.err.println("Error while checking piece's sha1");
+				}
+				
 			}
 			
 		}
@@ -281,8 +349,8 @@ public class PeerConnection extends Thread {
 		}
 		
 		public void run() {	
+
 			byte id = msg[4];
-			System.out.println("New message with ID : " + id);
 			
 			switch (id) {
 				
@@ -327,79 +395,36 @@ public class PeerConnection extends Thread {
 					break;
 				
 				case 6:
+				
 					break;
+				
 				case 7:
 
 					// Gets the block's size
 					byte[] msgLength = new byte[4];
 					System.arraycopy(msg, 0, msgLength, 0, 4);
-					int blockLength = ByteBuffer.wrap(msgLength).getInt() - 13;
+					int blockLength = ByteBuffer.wrap(msgLength).getInt() - 9;
 				
 					byte[] tmpIndexPiece = new byte[4];
-					byte[] begin = new byte[4];
+					byte[] tmpBegin = new byte[4];
 					byte[] block = new byte[blockLength];
 					
 					System.arraycopy(msg, 5, tmpIndexPiece, 0, 4);
-					System.arraycopy(msg, 9, begin, 0, 4);
-					System.arraycopy(msg, 13, block, 0, 4);
+					System.arraycopy(msg, 9, tmpBegin, 0, 4);
+					System.arraycopy(msg, 13, block, 0, blockLength);
+				
+					int indexPiece = ByteBuffer.wrap(tmpIndexPiece).getInt();
+					int begin = ByteBuffer.wrap(tmpBegin).getInt();
 				
 					if (metafile.isSingleFile()) {
 						
-						File file = new File(metafile.getName());
-						Path path = Paths.get(metafile.getName());
-						int indexPiece = ByteBuffer.wrap(tmpIndexPiece).getInt();
-						
-						try {
-							
-							// Writes the block
-							OutputStream out = new BufferedOutputStream(Files.newOutputStream(path));
-							out.write(block, indexPiece * BLOCK_SIZE, blockLength);
-							
-						} catch (Exception e) {
-							System.err.println("Error while writing to file");
-						}
-						
-						try {
-							
-							FileInputStream fin = new FileInputStream(file);
-							int pieceLength = metafile.getPiece_length();
-							
-							// This is the last piece and hes's smaller than others
-							if (indexPiece * pieceLength + pieceLength > metafile.getLength()) {
-								pieceLength = metafile.getLength() - indexPiece * pieceLength;
-							}
-							
-							// Gets the piece
-							byte[] piece = new byte[pieceLength];
-							fin.read(piece, indexPiece * pieceLength, pieceLength);
-							
-							// Gets the sha1 of the piece
-							MessageDigest md = MessageDigest.getInstance("SHA-1");
-							md.update(piece);
-							byte[] pieceHash = md.digest();
-							
-							// Gets the real sha1
-							byte[] realPieceHash = new byte[pieceLength];
-							System.arraycopy(metafile.getPieces(), indexPiece * pieceLength, realPieceHash, 0, 20);
-							
-							// Checks the sha1
-							if (realPieceHash.equals(pieceHash)) {
-								piecesDownloaded[indexPiece] = 2;
-								System.out.println("Piece " + indexPiece + " downloaded successfully");	
-							}
-							
-						} catch (Exception e) {
-							System.err.println("Error while checking piece's sha1");
-						}
-						
+						System.arraycopy(block, 0, piece, begin, blockLength);
 						
 					} else {
-						
-						System.out.println("Multifiles not supported");
-						
+						System.out.println("Multifiles not supported");	
 					}
 				
-				
+					blocksReceived++;
 				
 					break;
 				
@@ -411,7 +436,7 @@ public class PeerConnection extends Thread {
 		}
 		
 	}
-
+	
 	// http://www.herongyang.com/Java/Bit-String-Get-Bit-from-Byte-Array.html
 	public int getBit(byte[] data, int pos) {
 		int posByte = pos / 8; 
@@ -505,7 +530,6 @@ public class PeerConnection extends Thread {
 				DataOutputStream output = new DataOutputStream(socket.getOutputStream());
 				output.write(msg);
 				output.flush();
-				System.out.println("Send message with ID : " + msg[4]);
 				
 			} catch (Exception e) {
 				System.err.println("Error while sending message");

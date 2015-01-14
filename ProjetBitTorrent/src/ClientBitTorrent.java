@@ -7,7 +7,7 @@ public class ClientBitTorrent {
 
 	public static void main(String[] args) {
 
-		Metafile metafile = new Metafile("../../Documents/test1.torrent");
+		Metafile metafile = new Metafile("../../Documents/test3.torrent");
 
 		Torrent torrent = new Torrent(metafile, socketPort, peerID);
 		Map<String, ?> responseTracker = torrent.request();
@@ -17,6 +17,6 @@ public class ClientBitTorrent {
 		PeersManager pm = new PeersManager(peers, metafile, torrent.getInfoHash(), peerID);
 		pm.startDownload();
 		
-		
 	}
+	
 }
