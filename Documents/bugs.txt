@@ -59,7 +59,24 @@ Vous verrez que plus aucun peer ne répondra correctement. Vous aurez des "End o
 
 ===================================================================================================================
 
+14 janvier 2014
+Problème : 
+Certains blocks ne se téléchargent pas correctement.
 
+Solution :
+Lors de la réception d'un block, on calculait la taille dynamiquement (car le dernier block d'une pièce pouvait potentiellement être plus petit que la taille fixe définie dans le code). Lors de ce calcul, nous récupérions la valeur du champs "length" et en déduisant la longueur de l'en-tête nous obtenions la taille du block. Là où nous avons fait faux, c'est d'avoir déduit la longueur du champs "length" aussi, alors que celui n'est pas comptabilisé dans sa propre valeur. Par conséquent, tous les blocks avaient une taille trop petite de 4 bytes.
+
+Reproduction :
+
+Dans le fichier PeerConnection.java, remplacer la ligne :
+
+int blockLength = ByteBuffer.wrap(msgLength).getInt() - 9; // 1 (id) + 4 (index) + 4 (begin) = 9 --> correct
+
+Par :
+
+int blockLength = ByteBuffer.wrap(msgLength).getInt() - 13; // 4 (length) + 1 (id) + 4 (index) + 4 (begin) --> incorrect
+
+===================================================================================================================
 
 
 
