@@ -1,4 +1,5 @@
 import java.util.Map;
+import java.math.BigInteger;
 
 public class ClientBitTorrent {
 	
@@ -8,15 +9,34 @@ public class ClientBitTorrent {
 	public static void main(String[] args) {
 
 		Metafile metafile = new Metafile("../../Documents/test3.torrent");
-
 		Torrent torrent = new Torrent(metafile, socketPort, peerID);
-		Map<String, ?> responseTracker = torrent.request();
-		System.out.println(responseTracker);
-		Peers peers = new Peers(responseTracker);
-		System.out.println("Number of peers : " + peers.getPeers().size());
-		PeersManager pm = new PeersManager(peers, metafile, torrent.getInfoHash(), peerID);
-		pm.startDownload();
+		PeersManager pm = new PeersManager(metafile, torrent.getInfoHash(), peerID);
 		
+		Map<String, ?> responseTracker = torrent.request();
+		
+		if (responseTracker == null) {
+			System.out.println("Can't request the tracker");
+			return;
+		}
+		
+		int interval = ((BigInteger) responseTracker.get("interval")).intValue();
+		int timeBetweenRequest = 30; // seconds
+		
+		while (true) {
+			
+			responseTracker = torrent.request();
+			Peers peers = new Peers(responseTracker);
+			System.out.println("Request to the tracker : " + peers.getPeers().size() + " peers availables");
+			pm.setPeers(peers);
+			pm.update();
+			
+			try {
+				Thread.sleep(timeBetweenRequest * 1000);
+			} catch (InterruptedException e) {
+				System.err.println("Error while trying to sleep");
+			}
+			
+		}
 	}
 	
 }

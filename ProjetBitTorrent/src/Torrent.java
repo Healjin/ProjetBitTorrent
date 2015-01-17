@@ -176,7 +176,6 @@ public class Torrent {
 					"&event=" + this.event + 
 					"&key=12345" + "&compact=1");
 
-			System.out.println(url);
 			HttpURLConnection connexion = (HttpURLConnection) url.openConnection();
 
 			// Set properties
@@ -192,7 +191,6 @@ public class Torrent {
 			responseContent = bencodeDecoder.readMap();
 
 		} catch (Exception e) {
-			e.printStackTrace();
 			System.err.println("Error while sending request to tracker");
 		}
 

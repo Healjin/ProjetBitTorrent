@@ -14,6 +14,13 @@ import java.nio.file.*;
 import java.io.FileInputStream;
 import java.security.MessageDigest;
 import java.io.RandomAccessFile;
+import java.util.Locale;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.io.File;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.util.Date;
 
 public class PeerConnection extends Thread {
 	
@@ -32,8 +39,11 @@ public class PeerConnection extends Thread {
 	Boolean handshaken = false;
 	Boolean choked = true;
 	Boolean interested = false;
+	int bytesReaded = 0;
 	int blocksReceived = 0;
 	byte[] piece;
+	Boolean isAlive = false;
+	Boolean isRunning = false;
 
 	public PeerConnection(Peer peer, Metafile metafile, int[] piecesDownloaded, byte[] infoHash, String peerID) throws IOException {
 		
@@ -46,12 +56,9 @@ public class PeerConnection extends Thread {
 		this.peerID = peerID;
 		
 		// Initlialize connection to peer
-		System.out.print("=========================================================" + "\n");
-		System.out.println("Connection to " + peer.toString());
 		System.out.flush();
 		socket = new Socket();
 		socket.connect(new InetSocketAddress(peer.getIP(), peer.getPort()), TIME_OUT_CONNECTION);
-		System.out.println("Connected to peer " + peer.toString());
 		
 		// Proceed to the handshake
 		handshaken = handshake();
@@ -84,7 +91,6 @@ public class PeerConnection extends Thread {
 
 			// Set time out value
 			socket.setSoTimeout(TIME_OUT_HANDSHAKE);
-			System.out.println("sending handshake");
 			
 			// Send handshake
 			mDataOut.write(handshake);
@@ -92,13 +98,10 @@ public class PeerConnection extends Thread {
 
 			// Wait response
 			byte[] response = new byte[68];
-			System.out.println("Waiting response");
 			System.out.flush();
 
 			// Read response from peer
 			mDataIn.readFully(response);
-
-			System.out.println("Response received");
 
 			byte[] responseInfoHash = Arrays.copyOfRange(response, 28, 48);
 			byte sizeProtocolName = response[0];
@@ -113,6 +116,10 @@ public class PeerConnection extends Thread {
 					String peerID = new String(Arrays.copyOfRange(response, 48, 68));
 					peer.setPeerID(peerID);
 					
+					// Start keepConnectionAlive
+					keepConnectionAlive kp = new keepConnectionAlive();
+					kp.start();
+					
 					// Handshake is correct.
 					return true;
 					
@@ -124,10 +131,10 @@ public class PeerConnection extends Thread {
 			return false; 
 			
 		} catch (EOFException e) {
-			System.out.print("Data from " + peer.toString() + " are corrupted." + "\n");
+			// System.out.print("Data from " + peer.toString() + " are corrupted." + "\n");
 			return false;
 		} catch (IOException e) {
-			System.out.print("Error while tryin to read data input stream from " + peer.toString() + "\n");
+			// System.out.print("Error while tryin to read data input stream from " + peer.toString() + "\n");
 			return false;
 		}
 		
@@ -144,6 +151,14 @@ public class PeerConnection extends Thread {
 	}
 	
 	public void run() {
+		
+		System.out.println("Start download with : " + peer.getIP() + ":" + peer.getPort());
+		
+		isRunning = true;
+		
+		// Start logs
+		writeLogs wl = new writeLogs();
+		wl.start();
 		
 		// Start listening to peer
 		ReceiveMessages rm = new ReceiveMessages();
@@ -465,12 +480,12 @@ public class PeerConnection extends Thread {
 				ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE_INPUT);
 				int msgLength = 1500;
 				DataInputStream input = new DataInputStream(socket.getInputStream());
-				System.out.println("Start listening to messages");
 				
 				while (true) {
 					Thread.sleep(50);
 					// Check if some data is available
 					int size = input.available();
+					bytesReaded += size;
 					
 					// Some data is available
 					if (size > 0) {
@@ -532,11 +547,91 @@ public class PeerConnection extends Thread {
 				output.flush();
 				
 			} catch (Exception e) {
-				System.err.println("Error while sending message");
+				
+				isAlive = false;
+				System.out.println("Connection with : " + peer.getIP() + ":" + peer.getPort() + " is down");
+
 			}
 			
 		}
 		
-	}	
+	}
+	
+	public class keepConnectionAlive extends Thread {
+		
+		private int timeBetweenMessages = 2; // minutes
+		
+		public void run() {
+			
+			isAlive = true;
+			
+			while (isAlive) {
+		
+				byte[] msg = ByteBuffer.allocate(4).putInt(0).array();
+				SendMessage sm = new SendMessage(msg);
+				sm.start();
+				
+				try {
+					Thread.sleep(1000 * 60 * timeBetweenMessages);
+				} catch (InterruptedException e) {
+					System.err.println("Error while trying to sleep");
+				}	
+				
+			}
+			
+		}
+		
+	}
+	
+	public class writeLogs extends Thread {
+		
+		public void run() {
+			
+			int timeBetweenWriting = 10; // secondes
+			File file = new File(metafile.getName() + ".logs.txt");
+			
+			while (true) {
+							
+				try {
+					Thread.sleep(1000 * timeBetweenWriting);
+				} catch (InterruptedException e) {
+					System.err.println("Error while trying to sleep");
+				}	
+
+				Locale locale = Locale.getDefault();
+				DateFormat dateFormat = new SimpleDateFormat("dd.MM.yyyy-HH:mm:ss");
+				int speed = bytesReaded / timeBetweenWriting / 1024; // KB/seconds
+				bytesReaded = 0;
+				String remotePieces = "";
+				
+				for (int i = 0; i < remotePiecesAvailables.length; i++) {
+					if (remotePiecesAvailables[i] == 0) {
+						remotePieces += i + ":";
+					}
+				}
+				
+				if (remotePieces.equals("")) {
+					remotePieces = "none";
+				}
+				
+				try {
+
+					BufferedWriter output = new BufferedWriter(new FileWriter(file, true));
+					output.write(dateFormat.format(new Date()) + ",");
+					output.write(peer.getIP() + ":" + peer.getPort() + ",");
+					output.write(speed + ",");
+					output.write(remotePieces + ",");
+					output.write("\n");
+					output.close();
+					
+				} catch ( IOException e ) {
+					e.printStackTrace();
+				}
+				
+			}
+			
+		}
+		
+	}
 
 }
