@@ -4,7 +4,6 @@ import java.util.ArrayList;
 
 public class PeersManager {
 
-	final int MAX_CONNECTIONS = 5;
 	
 	Peers peers;
 	int[] piecesDownloaded; // 0 = non downloaded, 1 = in progress , 2 = download finished
@@ -13,14 +12,16 @@ public class PeersManager {
 	Metafile metafile;
 	ArrayList<PeerConnection> peerConnections;
 	int connectionsCount = 0;
+	int maxConnections;
 
-	public PeersManager(Metafile metafile, byte[] infoHash, String peerID) {
+	public PeersManager(Metafile metafile, byte[] infoHash, String peerID, int maxConnections) {
 
 		this.infoHash = infoHash;
 		this.peerID = peerID;
 		this.piecesDownloaded = new int[metafile.getPieces().length / 20];
 		this.peerConnections = new ArrayList<PeerConnection>();
 		this.metafile = metafile;
+		this.maxConnections = maxConnections;
 		
 		manager mng = new manager();
 		mng.start();
@@ -92,7 +93,7 @@ public class PeersManager {
 					if (pc.isAlive == false) {
 						toRemove.add(pc);
 						connectionsCount--;
-					} else if (connectionsCount < MAX_CONNECTIONS && pc.isRunning == false) {
+					} else if (connectionsCount < maxConnections && pc.isRunning == false) {
 						pc.start();
 						connectionsCount++;
 					}

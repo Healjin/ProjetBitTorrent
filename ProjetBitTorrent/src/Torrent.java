@@ -1,3 +1,10 @@
+/*-------------------------------------------------------------------------
+	FILE		: 	Torrent.java
+	DESCRIPTION	:	This class is used to create the frame that will be 
+					sent to the tracker. It also allows the request to the 
+					tracker as well as recover the response from it.
+	AUTHORS		:	Magnin Antoine, Da Silva Andrade David
+-------------------------------------------------------------------------*/
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -9,7 +16,6 @@ import java.net.URL;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Map;
-
 import org.ardverk.coding.BencodingInputStream;
 
 public class Torrent {
@@ -27,9 +33,17 @@ public class Torrent {
 	private long left;
 	private String event = null;
 
-	/*-----------------
-		CONSTRUCTOR
-	-----------------*/
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	This constructor is used to allocate the disk space 
+						used by the file to download. It also allows to retrieve
+						the sha-1 to be used in the request to the tracker. It 
+						also instantiates the various fields to send the request 
+						to the tracker.
+		PARAMS		:	(Metafile) file
+						(Integer) socketPort
+						(String) peerID
+		RETURN		:	None
+	-------------------------------------------------------------------------*/
 	@SuppressWarnings("unchecked")
 	public Torrent(Metafile file, Integer socketPort, String peerID) {
 
@@ -153,10 +167,14 @@ public class Torrent {
 
 	}
 
-	/*-------------------------------------------------
-		FUNCTION	: request
-		DESCRIPTION : Send a request to the tracker
-	-------------------------------------------------*/
+
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	This method is used to create the request to the tracker
+		 				and to send it. Once the response receive, it's debencoded
+		 				and returned.
+		PARAMS		:	None
+		RETURN		:	(Map<String, ?>) response from tracker
+	-------------------------------------------------------------------------*/
 	@SuppressWarnings("resource")
 	public Map<String, ?> request() {
 		// Decoder to decode the response from the tracker
@@ -184,7 +202,7 @@ public class Torrent {
 			connexion.connect();
 
 			// Send request
-			int code = connexion.getResponseCode();
+			connexion.getResponseCode();
 
 			bencodeDecoder = new BencodingInputStream((InputStream) connexion.getInputStream());
 
@@ -200,8 +218,9 @@ public class Torrent {
 	}
 
 	/*------------------------------------------------------------------------
-		FUNCTION 	: encodeURL
-		DESCRIPTION	: Encodes a String in hexadecimal format to URL format
+		DESCRIPTION	: 	Encodes a String in hexadecimal format to URL format
+		PARAMS		:	(String) hexString
+		RETURN		:	(String) url encoded
 	------------------------------------------------------------------------*/
 	public static String encodeURL(String hexString) throws Exception {
 
@@ -228,7 +247,9 @@ public class Torrent {
 		return new String(output);
 
 	}
-
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	Getters to access infohash and client's peerID
+	-------------------------------------------------------------------------*/
 	public byte[] getInfoHash(){
 		return this.infoHash;
 	}

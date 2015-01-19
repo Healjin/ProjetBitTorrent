@@ -1,3 +1,13 @@
+/*-------------------------------------------------------------------------
+	FILE		: 	Peers.java
+	DESCRIPTION	:	This class is intended to extract IP and port of 
+					peers from the tracker response. It also allows to get 
+					the time between each request to the tracker, the 
+					number of seeders and the number of leechers.
+					All peers are stored in an ArrayList of peer.
+					Each values are accessible by getters.
+	AUTHORS		:	Magnin Antoine, Da Silva Andrade David
+-------------------------------------------------------------------------*/
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Map;
@@ -16,6 +26,15 @@ public class Peers {
 
 	Map<String, ?> responseTracker;
 
+	/*------------------------------------------------------------------------
+		DESCRIPTION	: 	This constructor is intended to extract IP and port of 
+						peers from the tracker response. It also allows to get 
+						the time between each request to the tracker, the 
+						number of seeders and the number of leechers.
+						All peers are stored in an ArrayList of peer.
+		PARAMS		:	(Map<String, ?>) responseTracker
+		RETURN		:	None
+	------------------------------------------------------------------------*/
 	public Peers(Map<String, ?> responseTracker) {
 		this.responseTracker = responseTracker;
 
@@ -48,7 +67,10 @@ public class Peers {
 			}
 		}
 	}
-
+	
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	Getters to access peers parameters
+	-------------------------------------------------------------------------*/
 	public Integer getInterval() {
 		return interval;
 	}

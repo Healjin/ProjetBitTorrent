@@ -1,3 +1,9 @@
+/*-------------------------------------------------------------------------
+	FILE		: 	Peer.java
+	DESCRIPTION	:	
+	AUTHORS		:	Magnin Antoine, Da Silva Andrade David
+-------------------------------------------------------------------------*/
+
 public class Peer {
 
 	String ip;

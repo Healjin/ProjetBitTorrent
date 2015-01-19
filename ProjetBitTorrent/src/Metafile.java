@@ -1,3 +1,9 @@
+/*-------------------------------------------------------------------------
+	FILE		: 	Metafile.java
+	DESCRIPTION	:	This class is used to extract the data in the metafile 
+					file. Once extracted data can be retrieved via getters.
+	AUTHORS		:	Magnin Antoine, Da Silva Andrade David
+-------------------------------------------------------------------------*/
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -32,6 +38,12 @@ public class Metafile {
 
 	boolean multiFile = false;
 
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	Constructor that will extract all values from the file
+						given in parameter.
+		PARAMS		:	(String) file
+		RETURN		:	None
+	-------------------------------------------------------------------------*/
 	@SuppressWarnings({ "unchecked" })
 	public Metafile(String file) {
 		
@@ -93,6 +105,9 @@ public class Metafile {
 		}
 	}
 
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	Getters to access data from metafile.
+	-------------------------------------------------------------------------*/
 	public String getAnnounce() {
 		return announce;
 	}
@@ -141,11 +156,17 @@ public class Metafile {
 		return files;
 	}
 
-	public Boolean isSingleFile() {
-		return !multiFile;
-	}
-
 	public String getSource() {
 		return source;
+	}
+
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	return true if torrent is multi-files otherwise return
+						false
+		PARAMS		:	None
+		RETURN		:	Boolean
+	-------------------------------------------------------------------------*/
+	public Boolean isSingleFile() {
+		return !multiFile;
 	}
 }

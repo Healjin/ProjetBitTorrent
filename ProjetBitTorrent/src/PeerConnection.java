@@ -1,25 +1,21 @@
+import java.io.BufferedWriter;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.util.Arrays;
 import java.nio.ByteBuffer;
-import java.io.ByteArrayOutputStream;
-import java.io.BufferedOutputStream;
-import java.nio.file.*;
-import java.io.FileInputStream;
 import java.security.MessageDigest;
-import java.io.RandomAccessFile;
-import java.util.Locale;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.io.File;
-import java.io.BufferedWriter;
-import java.io.FileWriter;
+import java.util.Arrays;
 import java.util.Date;
 
 public class PeerConnection extends Thread {
@@ -167,34 +163,7 @@ public class PeerConnection extends Thread {
 		
 		// Start listening to peer
 		ReceiveMessages rm = new ReceiveMessages();
-		rm.start();
-		
-		/*try {
-			
-			byte[] bitfield = new byte[(int) Math.ceil(piecesDownloaded.length / 8)];
-
-			// Set the bitfield
-			for (int i = 0; i < piecesDownloaded.length; i++) {
-				if (piecesDownloaded[i] == 1) {
-					setBit(bitfield, i, piecesDownloaded[i]);
-				}
-			}
-
-			// Construct message
-			ByteArrayOutputStream out = new ByteArrayOutputStream();
-			byte[] msgLength = ByteBuffer.allocate(4).putInt(bitfield.length).array();
-			out.write(msgLength);
-			out.write(5);
-			out.write(bitfield);
-			out.flush();
-			
-			// Send bitfield
-			SendMessage sm = new SendMessage(out.toByteArray());
-			sm.start();
-			
-		} catch (Exception e) {
-			System.err.println("Error while sending bitfield");
-		}*/		
+		rm.start();	
 		
 		byte[] interested = new byte[5];
 		byte[] msgLength2 = ByteBuffer.allocate(4).putInt(1).array();
@@ -340,11 +309,14 @@ public class PeerConnection extends Thread {
 					}
 
 					try {
-							
-						// Writes the piece on file
-						RandomAccessFile tmp = new RandomAccessFile(metafile.getName(), "rw");
-						tmp.seek(indexPieceMissing * metafile.getPiece_length());
-						tmp.write(piece, 0, pieceLength);
+						
+						if (metafile.isSingleFile()) {
+							// Writes the piece on file
+							RandomAccessFile tmp = new RandomAccessFile(metafile.getName(), "rw");
+							tmp.seek(indexPieceMissing * metafile.getPiece_length());
+							tmp.write(piece, 0, pieceLength);
+							tmp.close();
+						}
 						
 					} catch (Exception e) {
 						System.err.println("Error while writing to file");
@@ -433,16 +405,10 @@ public class PeerConnection extends Thread {
 					System.arraycopy(msg, 9, tmpBegin, 0, 4);
 					System.arraycopy(msg, 13, block, 0, blockLength);
 				
-					int indexPiece = ByteBuffer.wrap(tmpIndexPiece).getInt();
+					ByteBuffer.wrap(tmpIndexPiece).getInt();
 					int begin = ByteBuffer.wrap(tmpBegin).getInt();
-				
-					if (metafile.isSingleFile()) {
-						
-						System.arraycopy(block, 0, piece, begin, blockLength);
-						
-					} else {
-						System.out.println("Multifiles not supported");	
-					}
+					
+					System.arraycopy(block, 0, piece, begin, blockLength);
 				
 					blocksReceived++;
 				
@@ -464,16 +430,6 @@ public class PeerConnection extends Thread {
 		byte valByte = data[posByte];
 		int valInt = valByte >> (8 - (posBit + 1)) & 0x0001;
 		return valInt;
-	}
-	
-	// http://www.herongyang.com/Java/Bit-String-Set-Bit-to-Byte-Array.html
-	private static void setBit(byte[] data, int pos, int val) {
-		int posByte = pos/8; 
-		int posBit = pos%8;
-		byte oldByte = data[posByte];
-		oldByte = (byte) (((0xFF7F>>posBit) & oldByte) & 0x00FF);
-		byte newByte = (byte) ((val<<(8-(posBit+1))) | oldByte);
-		data[posByte] = newByte;
 	}
 	
 	public class ReceiveMessages extends Thread {
@@ -600,7 +556,6 @@ public class PeerConnection extends Thread {
 					System.err.println("Error while trying to sleep");
 				}	
 
-				Locale locale = Locale.getDefault();
 				DateFormat dateFormat = new SimpleDateFormat("dd.MM.yyyy-HH:mm:ss");
 				int speed = bytesReaded / TIME_BETWEEN_LOGS / 1024; // KB/seconds
 				bytesReaded = 0;
