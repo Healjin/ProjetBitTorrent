@@ -1,6 +1,13 @@
 import java.util.Map;
 import java.math.BigInteger;
 
+/*-------------------------------------------------------------------------
+	DESCRIPTION	:	sssssmmmasdaskjdhaskjdhaskjhd
+					asdjslkdjslkjdaslkjdalsjdlaksjdlkasd
+					asjdaskjdhaskd
+	PARAMS		:	(type) Name
+	RETURN		:	None
+-------------------------------------------------------------------------*/
 public class ClientBitTorrent {
 	
 	final static String peerID = "92890643890438943890";

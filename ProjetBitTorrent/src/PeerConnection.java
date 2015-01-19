@@ -28,6 +28,8 @@ public class PeerConnection extends Thread {
 	final int TIME_OUT_HANDSHAKE = 2000;
 	final int BUFFER_SIZE_INPUT = 65536;
 	final int BLOCK_SIZE = 16384;
+	final int TIME_BETWEEN_KEEPALIVE = 2; // minutes
+	final int TIME_BETWEEN_LOGS = 10; // secondes
 
 	int[] piecesDownloaded; // 0 = non downloaded, 1 = in progress , 2 = download finished
 	int[] remotePiecesAvailables; // 0 = not available, 1 = available
@@ -142,11 +144,14 @@ public class PeerConnection extends Thread {
 	
 	// Return -1 if all pieces available on the peer are downloaded
 	private int getFirstPieceMissing(){
-		for (int i = 0; i < piecesDownloaded.length; i++) {
-			if((piecesDownloaded[i] == 0) && (remotePiecesAvailables[i] == 1)){
-				return i;
+		synchronized (piecesDownloaded) {
+			for (int i = 0; i < piecesDownloaded.length; i++) {
+				if((piecesDownloaded[i] == 0) && (remotePiecesAvailables[i] == 1)){
+					piecesDownloaded[i] = 1;
+					return i;
+				}
 			}
-		}	
+		}
 		return -1; // No pieces missing
 	}
 	
@@ -227,9 +232,7 @@ public class PeerConnection extends Thread {
 			{
 
 				System.out.println("Piece " + indexPieceMissing + " in progress ...");
-
-				piecesDownloaded[indexPieceMissing] = 1;
-
+				
 				int pieceLength = metafile.getPiece_length();
 				int lastPieceLength;
 				
@@ -324,14 +327,16 @@ public class PeerConnection extends Thread {
 					// Gets the real sha1
 					byte[] realPieceHash = new byte[20];
 					System.arraycopy(metafile.getPieces(), indexPieceMissing * 20, realPieceHash, 0, 20);
-
-					// Checks the sha1
-					if (java.util.Arrays.equals(realPieceHash,pieceHash)) {
-						piecesDownloaded[indexPieceMissing] = 2;
-						System.out.println("Piece " + indexPieceMissing + " downloaded successfully");
-					} else {
-						piecesDownloaded[indexPieceMissing] = 0;
-						System.out.println("Piece " + indexPieceMissing + " not downloaded");
+					
+					synchronized (piecesDownloaded) {
+						// Checks the sha1
+						if (java.util.Arrays.equals(realPieceHash,pieceHash)) {
+							piecesDownloaded[indexPieceMissing] = 2;
+							System.out.println("Piece " + indexPieceMissing + " downloaded successfully");
+						} else {
+							piecesDownloaded[indexPieceMissing] = 0;
+							System.out.println("Piece " + indexPieceMissing + " not downloaded");
+						}
 					}
 
 					try {
@@ -559,8 +564,6 @@ public class PeerConnection extends Thread {
 	
 	public class keepConnectionAlive extends Thread {
 		
-		private int timeBetweenMessages = 2; // minutes
-		
 		public void run() {
 			
 			isAlive = true;
@@ -572,7 +575,7 @@ public class PeerConnection extends Thread {
 				sm.start();
 				
 				try {
-					Thread.sleep(1000 * 60 * timeBetweenMessages);
+					Thread.sleep(1000 * TIME_BETWEEN_KEEPALIVE);
 				} catch (InterruptedException e) {
 					System.err.println("Error while trying to sleep");
 				}	
@@ -587,20 +590,19 @@ public class PeerConnection extends Thread {
 		
 		public void run() {
 			
-			int timeBetweenWriting = 10; // secondes
 			File file = new File(metafile.getName() + ".logs.txt");
 			
 			while (true) {
 							
 				try {
-					Thread.sleep(1000 * timeBetweenWriting);
+					Thread.sleep(1000 * TIME_BETWEEN_LOGS);
 				} catch (InterruptedException e) {
 					System.err.println("Error while trying to sleep");
 				}	
 
 				Locale locale = Locale.getDefault();
 				DateFormat dateFormat = new SimpleDateFormat("dd.MM.yyyy-HH:mm:ss");
-				int speed = bytesReaded / timeBetweenWriting / 1024; // KB/seconds
+				int speed = bytesReaded / TIME_BETWEEN_LOGS / 1024; // KB/seconds
 				bytesReaded = 0;
 				String remotePieces = "";
 				
@@ -619,8 +621,9 @@ public class PeerConnection extends Thread {
 					BufferedWriter output = new BufferedWriter(new FileWriter(file, true));
 					output.write(dateFormat.format(new Date()) + ",");
 					output.write(peer.getIP() + ":" + peer.getPort() + ",");
+					output.write(peer.getPeerID() + ",");
 					output.write(speed + ",");
-					output.write(remotePieces + ",");
+					//output.write(remotePieces + ",");
 					output.write("\n");
 					output.close();
 					

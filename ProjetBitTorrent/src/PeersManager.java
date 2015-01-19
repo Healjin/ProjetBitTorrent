@@ -4,7 +4,7 @@ import java.util.ArrayList;
 
 public class PeersManager {
 
-	final int MAX_CONNECTIONS = 2;
+	final int MAX_CONNECTIONS = 5;
 	
 	Peers peers;
 	int[] piecesDownloaded; // 0 = non downloaded, 1 = in progress , 2 = download finished
@@ -46,9 +46,11 @@ public class PeersManager {
 				// If the handshake worked as expected, return true.
 				if (peerConnection.handshaken) {
 					
-					// At this point we know that peerConnection is valid because the connection worked and the handshake too
-					this.peerConnections.add(peerConnection);
-
+					synchronized (peerConnections) { 
+						// At this point we know that peerConnection is valid because the connection worked and the handshake too
+						this.peerConnections.add(peerConnection);
+					}
+					
 				} // else, discard connection
 				
 			} catch (SocketTimeoutException e) {
@@ -65,9 +67,11 @@ public class PeersManager {
 	
 	public Boolean isDownloadFinished() {
 		
-		for (int i = 0; i < piecesDownloaded.length; i++) {
-			if (piecesDownloaded[i] == 0 || piecesDownloaded[i] == 1) {
-				return false;
+		synchronized (piecesDownloaded) {
+			for (int i = 0; i < piecesDownloaded.length; i++) {
+				if (piecesDownloaded[i] == 0 || piecesDownloaded[i] == 1) {
+					return false;
+				}
 			}
 		}
 		
@@ -81,17 +85,21 @@ public class PeersManager {
 			
 			while (isDownloadFinished() == false) {
 				
+				ArrayList<PeerConnection> toRemove = new ArrayList<PeerConnection>();
+
 				for (PeerConnection pc : peerConnections) {
-					
+
 					if (pc.isAlive == false) {
-						peerConnections.remove(pc);
+						toRemove.add(pc);
 						connectionsCount--;
 					} else if (connectionsCount < MAX_CONNECTIONS && pc.isRunning == false) {
 						pc.start();
 						connectionsCount++;
 					}
-					
+
 				}
+				
+				peerConnections.removeAll(toRemove);
 								
 				try {
 					Thread.sleep(1000);
