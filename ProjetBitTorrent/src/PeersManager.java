@@ -1,3 +1,9 @@
+/*-------------------------------------------------------------------------
+	FILE		: 	PeersManager.java
+	DESCRIPTION	:	Manages every peers returned by the tracker, in order
+					to download the file.
+	AUTHORS		:	Magnin Antoine, Da Silva Andrade David
+-------------------------------------------------------------------------*/
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
@@ -13,7 +19,16 @@ public class PeersManager {
 	ArrayList<PeerConnection> peerConnections;
 	int connectionsCount = 0;
 	int maxConnections;
-
+	
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	Retrieve all parameters and store it inside the class.
+						Create manager and start it.
+		PARAMS		: 	(Metafile) metafile
+						(byte[]) infohash
+						(String) peerID
+						(int) maxConnections
+		RETURN		: 	None
+	-------------------------------------------------------------------------*/
 	public PeersManager(Metafile metafile, byte[] infoHash, String peerID, int maxConnections) {
 
 		this.infoHash = infoHash;
@@ -27,14 +42,17 @@ public class PeersManager {
 		mng.start();
 
 	}
-	
-	public void setPeers(Peers peers) {
-		this.peers = peers;
-	}
 
-	public void update() {
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	Updates the peerConnections array
+		PARAMS		: 	(Peers) peers
+		RETURN		: 	None
+	-------------------------------------------------------------------------*/
+	public void updatePeers(Peers peers) {
 		
-		ArrayList<Peer> listPeers = peers.getPeers();
+		this.peers = peers;
+		
+		ArrayList<Peer> listPeers = this.peers.getPeers();
 
 		// Do all handhsakes
 		for (Peer peer : listPeers) {
@@ -65,7 +83,13 @@ public class PeersManager {
 		}
 		
 	}
-	
+
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	Returns true if the download is finished,
+						otherwise false
+		PARAMS		: 	None
+		RETURN		: 	(Boolean)
+	-------------------------------------------------------------------------*/
 	public Boolean isDownloadFinished() {
 		
 		synchronized (piecesDownloaded) {
@@ -79,7 +103,11 @@ public class PeersManager {
 		return true;
 		
 	}
-	
+
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	This manager removes PeerConnection objects with a
+						dead state. If required, he starts another one.
+	-------------------------------------------------------------------------*/
 	public class manager extends Thread {
 		
 		public void run() {

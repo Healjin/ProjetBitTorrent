@@ -1,5 +1,12 @@
+/*-------------------------------------------------------------------------
+	FILE		: 	PeerConnection.java
+	DESCRIPTION	:	This class contains a connection to one remote peer
+					with a socket. Pieces are downloaded and checked one 
+					by one here. It's an implementation of PWP protocol as
+					a bad leecher.
+	AUTHORS		:	Magnin Antoine, Da Silva Andrade David
+-------------------------------------------------------------------------*/
 import java.io.BufferedWriter;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -20,6 +27,7 @@ import java.util.Date;
 
 public class PeerConnection extends Thread {
 	
+	// CONFIGURATION CONSTANTS
 	final int TIME_OUT_CONNECTION = 2000;
 	final int TIME_OUT_HANDSHAKE = 2000;
 	final int BUFFER_SIZE_INPUT = 65536;
@@ -27,6 +35,7 @@ public class PeerConnection extends Thread {
 	final int TIME_BETWEEN_KEEPALIVE = 2; // minutes
 	final int TIME_BETWEEN_LOGS = 10; // secondes
 
+	// ATTRIBUTES
 	int[] piecesDownloaded; // 0 = non downloaded, 1 = in progress , 2 = download finished
 	int[] remotePiecesAvailables; // 0 = not available, 1 = available
 	byte[] infoHash;
@@ -43,6 +52,16 @@ public class PeerConnection extends Thread {
 	Boolean isAlive = false;
 	Boolean isRunning = false;
 
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	The constructor inits every attributes, initializes a
+						connection with a socket and proceeds to the handshake.
+		PARAMS		: 	(Peer) peer
+						(Metafile) metafile
+						(int[]) piecesDownloaded
+						(byte[]) infoHash
+						(String) peerID
+		RETURN		: 	None
+	-------------------------------------------------------------------------*/
 	public PeerConnection(Peer peer, Metafile metafile, int[] piecesDownloaded, byte[] infoHash, String peerID) throws IOException {
 		
 		// Initialize attributes
@@ -63,6 +82,13 @@ public class PeerConnection extends Thread {
 		
 	}
 
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	Sends a handshake to the remote peer and checks the
+						response received. Returns true if handshake is a
+						success, otherwise false.
+		PARAMS		: 	None
+		RETURN		: 	None
+	-------------------------------------------------------------------------*/
 	public Boolean handshake() {
 
 		byte[] handshake = new byte[68];
@@ -137,20 +163,40 @@ public class PeerConnection extends Thread {
 		}
 		
 	}
-	
-	// Return -1 if all pieces available on the peer are downloaded
+
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	Returns the index of the first piece available to the
+		 				remote peer and not already downloaded. Returns -1 if
+		 				none piece is found.
+		PARAMS		: 	None
+		RETURN		: 	None
+	-------------------------------------------------------------------------*/
 	private int getFirstPieceMissing(){
+		
 		synchronized (piecesDownloaded) {
+			
+			// Foreach pieces missing
 			for (int i = 0; i < piecesDownloaded.length; i++) {
+				// Is it available on the remote peer?
 				if((piecesDownloaded[i] == 0) && (remotePiecesAvailables[i] == 1)){
 					piecesDownloaded[i] = 1;
 					return i;
 				}
 			}
+			
 		}
+		
 		return -1; // No pieces missing
 	}
-	
+
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	This is the main function. Starts the writeLogs thread 
+						and the ReceiveMessages thread. Then requests every
+						blocks constituting one piece. Waits before the
+						download of one piece before doing some new requests.
+		PARAMS		: 	None
+		RETURN		: 	None
+	-------------------------------------------------------------------------*/
 	public void run() {
 		
 		System.out.println("Start download with : " + peer.getIP() + ":" + peer.getPort());
@@ -165,22 +211,15 @@ public class PeerConnection extends Thread {
 		ReceiveMessages rm = new ReceiveMessages();
 		rm.start();	
 		
+		// Constructs the interested message
 		byte[] interested = new byte[5];
 		byte[] msgLength2 = ByteBuffer.allocate(4).putInt(1).array();
 		System.arraycopy(msgLength2, 0, interested, 0, 4);
 		interested[4] = 2;
 		
-		ByteArrayOutputStream out2 = new ByteArrayOutputStream();
-		try {
-			out2.write(interested);
-			out2.flush();
-		} catch (IOException e) {
-			System.err.println("Error while sending request");			
-		}
-		
-		// Send bitfield
-		SendMessage sm2 = new SendMessage(out2.toByteArray());
-		sm2.start();
+		// Send the interested message
+		SendMessage smInterested = new SendMessage(interested);
+		smInterested.start();
 		
 		int indexPieceMissing = -1;
 		int blocksCount = (int) Math.floor(metafile.getPiece_length() / BLOCK_SIZE);
@@ -188,6 +227,7 @@ public class PeerConnection extends Thread {
 		
 		while(true) {
 			
+			// Reduces the CPU consummation
 			try {
 				Thread.sleep(50);
 			} catch (InterruptedException e) {
@@ -197,6 +237,7 @@ public class PeerConnection extends Thread {
 			int totalBlocksCount = blocksCount;
 			blocksReceived = 0;
 			
+			// If we are authorized to request a block, and a missing piece is available
 			if((choked == false) && ((indexPieceMissing = getFirstPieceMissing()) != -1))
 			{
 
@@ -205,79 +246,65 @@ public class PeerConnection extends Thread {
 				int pieceLength = metafile.getPiece_length();
 				int lastPieceLength;
 				
+				// If this is the last piece
 				if (indexPieceMissing == piecesDownloaded.length - 1) {
 					if ((lastPieceLength = metafile.getLength() % pieceLength) != 0) {
 						pieceLength = lastPieceLength;
 					}
 				}
 				
+				// Buffer to download the piece
 				piece = new byte[pieceLength];
-				for (int i = 0; i < pieceLength; i++) {
-					piece[i] = (byte) 0xFF;
-				}
 				
+				// For each blocks in the piece
 				for (int i = 0; i < blocksCount; i++) {
 				
-					// Constructs the request
+					// Gets fields
 					byte[] request = new byte[17];
 					byte[] msgLength = ByteBuffer.allocate(4).putInt(13).array();
 					byte[] index = 	ByteBuffer.allocate(4).putInt(indexPieceMissing).array();
 					byte[] begin = 	ByteBuffer.allocate(4).putInt(i * BLOCK_SIZE).array();
 					byte[] length = ByteBuffer.allocate(4).putInt(BLOCK_SIZE).array();	
 
+					// Constructs the request
 					System.arraycopy(msgLength, 0, request, 0, 4);
 					request[4] = 6;
 					System.arraycopy(index, 0, request, 5, 4);
 					System.arraycopy(begin, 0, request, 9, 4);
 					System.arraycopy(length, 0, request, 13, 4);
 					
-					ByteArrayOutputStream out = new ByteArrayOutputStream();
-
-					try {
-						out.write(request);
-						out.flush();
-					} catch (IOException e) {
-						System.err.println("Error while sending request");			
-					}
-					
 					// Send request
-					SendMessage sm = new SendMessage(out.toByteArray());
+					SendMessage sm = new SendMessage(request);
 					sm.start();
 					
 				}
 				
+				// If the last block's size is inferior as BLOCK_SIZE
 				if (rest != 0) {
 					
 					totalBlocksCount++;
 						
-					// Constructs the request
+					// Gets fields
 					byte[] request = new byte[17];
 					byte[] msgLength = ByteBuffer.allocate(4).putInt(13).array();
 					byte[] index = 	ByteBuffer.allocate(4).putInt(indexPieceMissing).array();
 					byte[] begin = 	ByteBuffer.allocate(4).putInt(blocksCount * BLOCK_SIZE).array();
 					byte[] length = ByteBuffer.allocate(4).putInt(rest).array();	
 
+					// Constructs the request
 					System.arraycopy(msgLength, 0, request, 0, 4);
 					request[4] = 6;
 					System.arraycopy(index, 0, request, 5, 4);
 					System.arraycopy(begin, 0, request, 9, 4);
 					System.arraycopy(length, 0, request, 13, 4);
 					
-					ByteArrayOutputStream out = new ByteArrayOutputStream();
-
-					try {
-						out.write(request);
-						out.flush();
-					} catch (IOException e) {
-						System.err.println("Error while sending request");			
-					}
-					
 					// Send request
-					SendMessage sm = new SendMessage(out.toByteArray());
+					SendMessage sm = new SendMessage(request);
 					sm.start();
 					
 				}
 				
+				// Waits until every blocks are downloaded
 				while (blocksReceived < totalBlocksCount) {
 					try {
 						Thread.sleep(50);
@@ -310,6 +337,7 @@ public class PeerConnection extends Thread {
 
 					try {
 						
+						// Only single file torrent are supported for writing on disk
 						if (metafile.isSingleFile()) {
 							// Writes the piece on file
 							RandomAccessFile tmp = new RandomAccessFile(metafile.getName(), "rw");
@@ -331,7 +359,11 @@ public class PeerConnection extends Thread {
 		}
 		
 	}
-	
+
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	Processes a message given in parameter. Follows the
+						PWP protocol RFC.
+	-------------------------------------------------------------------------*/
 	public class ProcessMessage extends Thread {
 		
 		byte[] msg;
@@ -408,6 +440,7 @@ public class PeerConnection extends Thread {
 					ByteBuffer.wrap(tmpIndexPiece).getInt();
 					int begin = ByteBuffer.wrap(tmpBegin).getInt();
 					
+					// Writes the block in the buffer
 					System.arraycopy(block, 0, piece, begin, blockLength);
 				
 					blocksReceived++;
@@ -422,8 +455,15 @@ public class PeerConnection extends Thread {
 		}
 		
 	}
-	
-	// http://www.herongyang.com/Java/Bit-String-Get-Bit-from-Byte-Array.html
+
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	Gets a bit from a byte array specified by the position
+						given in parameter. Function found in :
+						http://www.herongyang.com/Java/Bit-String-Get-Bit-from-Byte-Array.html
+		PARAMS		: 	(byte[]) data
+						(int) pos
+		RETURN		: 	(int) value of the bit
+	-------------------------------------------------------------------------*/
 	public int getBit(byte[] data, int pos) {
 		int posByte = pos / 8; 
 		int posBit = pos % 8;
@@ -431,7 +471,12 @@ public class PeerConnection extends Thread {
 		int valInt = valByte >> (8 - (posBit + 1)) & 0x0001;
 		return valInt;
 	}
-	
+
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	Thread listening of the socket and retrieving every
+						messages sent by the remote peer. Each message is
+						process by the ProcessMessage thread.
+	-------------------------------------------------------------------------*/
 	public class ReceiveMessages extends Thread {
 
 		public void run() {
@@ -443,7 +488,10 @@ public class PeerConnection extends Thread {
 				DataInputStream input = new DataInputStream(socket.getInputStream());
 				
 				while (true) {
+					
+					// Reduces the CPU consummation
 					Thread.sleep(50);
+					
 					// Check if some data is available
 					int size = input.available();
 					bytesReaded += size;
@@ -489,7 +537,10 @@ public class PeerConnection extends Thread {
 		}
 
 	}
-	
+
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	Sends a message given in parameter to the remote peer.
+	-------------------------------------------------------------------------*/
 	public class SendMessage extends Thread {
 		
 		byte[] msg;
@@ -509,6 +560,7 @@ public class PeerConnection extends Thread {
 				
 			} catch (Exception e) {
 				
+				// Peer is dead
 				isAlive = false;
 				System.out.println("Connection with : " + peer.getIP() + ":" + peer.getPort() + " is down");
 
@@ -517,7 +569,11 @@ public class PeerConnection extends Thread {
 		}
 		
 	}
-	
+
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	Keeps the connection alive by sending a keep-alive
+						message every X time.
+	-------------------------------------------------------------------------*/
 	public class keepConnectionAlive extends Thread {
 		
 		public void run() {
@@ -541,7 +597,11 @@ public class PeerConnection extends Thread {
 		}
 		
 	}
-	
+
+	/*-------------------------------------------------------------------------
+		DESCRIPTION	:	Gets some statistics from the download and writes
+						them on a log file.
+	-------------------------------------------------------------------------*/
 	public class writeLogs extends Thread {
 		
 		public void run() {
@@ -549,41 +609,47 @@ public class PeerConnection extends Thread {
 			File file = new File(metafile.getName() + ".logs.txt");
 			
 			while (true) {
-							
+				
+				// Waits X seconds between each entries
 				try {
 					Thread.sleep(1000 * TIME_BETWEEN_LOGS);
 				} catch (InterruptedException e) {
 					System.err.println("Error while trying to sleep");
 				}	
-
+				// Get actual time
 				DateFormat dateFormat = new SimpleDateFormat("dd.MM.yyyy-HH:mm:ss");
+				
+				// Calculate the download speed
 				int speed = bytesReaded / TIME_BETWEEN_LOGS / 1024; // KB/seconds
+				
 				bytesReaded = 0;
 				String remotePieces = "";
 				
+				// Gets the index of missing pieces
 				for (int i = 0; i < remotePiecesAvailables.length; i++) {
 					if (remotePiecesAvailables[i] == 0) {
 						remotePieces += i + ":";
 					}
 				}
-				
+				// if none missing
 				if (remotePieces.equals("")) {
 					remotePieces = "none";
 				}
 				
+				// Write everything in the file
 				try {
-
+					
 					BufferedWriter output = new BufferedWriter(new FileWriter(file, true));
 					output.write(dateFormat.format(new Date()) + ",");
 					output.write(peer.getIP() + ":" + peer.getPort() + ",");
 					output.write(peer.getPeerID() + ",");
 					output.write(speed + ",");
-					//output.write(remotePieces + ",");
+					output.write(remotePieces + ",");
 					output.write("\n");
 					output.close();
 					
 				} catch ( IOException e ) {
-					e.printStackTrace();
+					System.out.println("Error while writing logs in file");
 				}
 				
 			}
