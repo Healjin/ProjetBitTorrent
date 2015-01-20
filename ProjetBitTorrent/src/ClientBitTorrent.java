@@ -10,9 +10,17 @@ public class ClientBitTorrent {
 	final static int MAX_PEERS_CONNECTIONS = 5;
 	final static String peerID = "92890643890438943890";
 	final static int socketPort = 9002;
-	final static String nameFile = "../Documents/test3.torrent";
+	static String nameFile;
 
 	public static void main(String[] args) {
+		
+		if(args.length != 1)
+		{
+			System.out.println("Usage : java ClientBitTorrent <path_to_torrent_file>");
+			// Quitte l'application
+			System.exit(1);
+		}
+		nameFile = args[0];	
 		
 		// Extract all data from the torrent file
 		Metafile metafile = new Metafile(nameFile);
