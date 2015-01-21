@@ -222,10 +222,11 @@ public class PeerConnection extends Thread {
 		smInterested.start();
 		
 		int indexPieceMissing = -1;
-		int blocksCount = (int) Math.floor(metafile.getPiece_length() / BLOCK_SIZE);
-		int rest = metafile.getPiece_length() % BLOCK_SIZE;
 		
 		while(true) {
+
+			int blocksCount = (int) Math.floor(metafile.getPiece_length() / BLOCK_SIZE);
+			int rest = metafile.getPiece_length() % BLOCK_SIZE;
 			
 			// Reduces the CPU consummation
 			try {
