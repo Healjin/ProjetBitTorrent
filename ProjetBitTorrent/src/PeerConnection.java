@@ -329,26 +329,27 @@ public class PeerConnection extends Thread {
 						// Checks the sha1
 						if (java.util.Arrays.equals(realPieceHash,pieceHash)) {
 							piecesDownloaded[indexPieceMissing] = 2;
-							System.out.println("Piece " + indexPieceMissing + " downloaded successfully");
+							System.out.println("Piece " + indexPieceMissing + " downloaded successfully");							
+
+							try {
+
+								// Only single file torrent are supported for writing on disk
+								if (metafile.isSingleFile()) {
+									// Writes the piece on file
+									RandomAccessFile tmp = new RandomAccessFile(metafile.getName(), "rw");
+									tmp.seek(indexPieceMissing * metafile.getPiece_length());
+									tmp.write(piece, 0, pieceLength);
+									tmp.close();
+								}
+
+							} catch (Exception e) {
+								System.err.println("Error while writing to file");
+							}
+
 						} else {
 							piecesDownloaded[indexPieceMissing] = 0;
 							System.out.println("Piece " + indexPieceMissing + " not downloaded");
 						}
-					}
-
-					try {
-						
-						// Only single file torrent are supported for writing on disk
-						if (metafile.isSingleFile()) {
-							// Writes the piece on file
-							RandomAccessFile tmp = new RandomAccessFile(metafile.getName(), "rw");
-							tmp.seek(indexPieceMissing * metafile.getPiece_length());
-							tmp.write(piece, 0, pieceLength);
-							tmp.close();
-						}
-						
-					} catch (Exception e) {
-						System.err.println("Error while writing to file");
 					}
 
 				} catch (Exception e) {
