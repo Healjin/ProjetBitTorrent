@@ -16,7 +16,7 @@ public class ClientBitTorrent {
 		
 		if(args.length != 1)
 		{
-			System.out.println("Usage : java ClientBitTorrent <path_to_torrent_file>");
+			System.out.println("java -cp ../libs/bee-encode-0.2.jar:./ ClientBitTorrent <path_to_torrent_file>");
 			// Leave program
 			System.exit(1);
 		}
