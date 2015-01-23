@@ -99,9 +99,13 @@ public class Metafile {
 				}
 			}
 		} catch (FileNotFoundException e) {
-			e.printStackTrace();
+			System.out.println("Torrent file not found. Please check your path.");
+			// Leave program
+			System.exit(1);
 		} catch (IOException e) {
-			e.printStackTrace();
+			System.out.println("Error while trying to extract data from metafile");
+			// Leave program
+			System.exit(1);
 		}
 	}
 

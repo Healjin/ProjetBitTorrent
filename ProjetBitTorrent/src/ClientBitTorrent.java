@@ -17,7 +17,7 @@ public class ClientBitTorrent {
 		if(args.length != 1)
 		{
 			System.out.println("Usage : java ClientBitTorrent <path_to_torrent_file>");
-			// Quitte l'application
+			// Leave program
 			System.exit(1);
 		}
 		nameFile = args[0];	
